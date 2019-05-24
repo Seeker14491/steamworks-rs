@@ -5,7 +5,7 @@ use crate::{
     Client,
 };
 use snafu::{ensure, ResultExt};
-use std::{cmp, convert::TryInto, ffi::CString, mem::MaybeUninit};
+use std::{cmp, ffi::CString, mem::MaybeUninit};
 use steamworks_sys as sys;
 
 #[derive(Debug, Clone)]
@@ -24,14 +24,34 @@ impl LeaderboardHandle {
     /// Steamworks API functions.
     ///
     /// `range_start` and `range_end` are both inclusive. `max_details` should be <= 64; higher
-    /// values will be clamped.
+    /// values will be clamped. If `request_type` is `Friends`, the `range_start` and `range_end`
+    /// parameters are ignored.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if any of the following is violated:
+    ///
+    /// - If `request_type` is `Global` then `range_start > 0` and `range_end >= range_start` must
+    /// hold.
+    /// - If `request_type` is `GlobalAroundUser` then `range_end >= range_start` must hold.
     pub async fn download_entry_range(
         &self,
         request_type: LeaderboardDataRequest,
         range_start: i32,
         range_end: i32,
-        max_details: u32,
+        max_details: u8,
     ) -> Vec<LeaderboardEntry> {
+        match request_type {
+            LeaderboardDataRequest::Global => {
+                assert!(range_start > 0);
+                assert!(range_end >= range_start);
+            },
+            LeaderboardDataRequest::GlobalAroundUser => {
+                assert!(range_end >= range_start);
+            }
+            LeaderboardDataRequest::Friends => {}
+        }
+
         let max_details = cmp::min(max_details, 64);
 
         let response: sys::LeaderboardScoresDownloaded_t = self
@@ -59,7 +79,7 @@ impl LeaderboardHandle {
                     i,
                     raw_entry.as_mut_ptr(),
                     details.as_mut_ptr(),
-                    max_details.try_into().unwrap(),
+                    max_details.into(),
                 )
             };
 
@@ -85,7 +105,6 @@ pub enum LeaderboardDataRequest {
     Global,
     GlobalAroundUser,
     Friends,
-    Users,
 }
 
 impl Into<sys::ELeaderboardDataRequest> for LeaderboardDataRequest {
@@ -94,7 +113,6 @@ impl Into<sys::ELeaderboardDataRequest> for LeaderboardDataRequest {
             LeaderboardDataRequest::Global => 0,
             LeaderboardDataRequest::GlobalAroundUser => 1,
             LeaderboardDataRequest::Friends => 2,
-            LeaderboardDataRequest::Users => 3,
         }
     }
 }
