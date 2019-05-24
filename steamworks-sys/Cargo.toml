@@ -1,0 +1,10 @@
+[package]
+name = "steamworks-sys"
+version = "0.0.0"
+authors = ["Brian Bowman <seeker14491@gmail.com>"]
+edition = "2018"
+
+[build-dependencies]
+bindgen = "0.49.0"
+cc = "1.0.36"
+dunce = "1.0.0"
