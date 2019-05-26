@@ -106,7 +106,7 @@ impl Client {
 
         let success = unsafe { sys::SteamAPI_Init() };
         if !success {
-            STEAM_API_INITIALIZED.store(false, atomic::Ordering::AcqRel);
+            STEAM_API_INITIALIZED.store(false, atomic::Ordering::Release);
             return Other.fail();
         }
 
