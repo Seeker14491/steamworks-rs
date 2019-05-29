@@ -34,6 +34,10 @@ impl From<AppId> for u32 {
 pub struct SteamId(pub(crate) sys::CSteamID);
 
 impl SteamId {
+    pub fn new(id: u64) -> Self {
+        id.into()
+    }
+
     pub async fn persona_name(self, client: &Client) -> String {
         unsafe {
             let instance = client.0.friends as isize;
@@ -78,6 +82,14 @@ impl SteamId {
         };
 
         SteamId(steam_id)
+    }
+}
+
+impl From<u64> for SteamId {
+    fn from(inner: u64) -> Self {
+        SteamId(sys::CSteamID {
+            m_steamid: sys::CSteamID_SteamID_t { m_unAll64Bits: inner }
+        })
     }
 }
 
