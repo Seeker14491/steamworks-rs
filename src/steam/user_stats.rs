@@ -5,9 +5,16 @@ use crate::{
     Client,
 };
 use snafu::{ensure, ResultExt};
-use std::{cmp, ffi::CString, mem::MaybeUninit};
+use std::{cmp, convert::TryInto, ffi::CString, mem::MaybeUninit};
 use steamworks_sys as sys;
 
+/// A handle to a Steam leaderboard
+///
+/// The functions on this handle wrap the
+/// [`DownloadLeaderboardEntries()`](https://partner.steamgames.com/doc/api/ISteamUserStats#DownloadLeaderboardEntries)
+/// and
+/// [`GetDownloadedLeaderboardEntry()`](https://partner.steamgames.com/doc/api/ISteamUserStats#GetDownloadedLeaderboardEntry)
+/// Steamworks API functions.
 #[derive(Debug, Clone)]
 pub struct LeaderboardHandle {
     pub(crate) client: Client,
@@ -15,43 +22,78 @@ pub struct LeaderboardHandle {
 }
 
 impl LeaderboardHandle {
-    /// Fetches a range of leaderboard entries.
+    /// Fetches a sequential range of leaderboard entries by global rank.
     ///
-    /// This function wraps the
-    /// [`DownloadLeaderboardEntries()`](https://partner.steamgames.com/doc/api/ISteamUserStats#DownloadLeaderboardEntries)
-    /// and
-    /// [`GetDownloadedLeaderboardEntry()`](https://partner.steamgames.com/doc/api/ISteamUserStats#GetDownloadedLeaderboardEntry)
-    /// Steamworks API functions.
-    ///
-    /// `range_start` and `range_end` are both inclusive. `max_details` should be <= 64; higher
-    /// values will be clamped. If `request_type` is `Friends`, the `range_start` and `range_end`
-    /// parameters are ignored.
+    /// `range_start` and `range_end` are both inclusive. `max_details` should be 64 or less; higher
+    /// values will be clamped.
     ///
     /// # Panics
     ///
-    /// This function panics if any of the following is violated:
-    ///
-    /// - If `request_type` is `Global` then `range_start > 0` and `range_end >= range_start` must
-    /// hold.
-    /// - If `request_type` is `GlobalAroundUser` then `range_end >= range_start` must hold.
-    pub async fn download_entry_range(
+    /// Panics if `range_start < 1` or `range_end < range_start`.
+    pub async fn download_global(
         &self,
-        request_type: LeaderboardDataRequest,
+        range_start: u32,
+        range_end: u32,
+        max_details: u8,
+    ) -> Vec<LeaderboardEntry> {
+        assert!(range_start > 0);
+        assert!(range_end >= range_start);
+
+        self.download_entry_range(
+            sys::ELeaderboardDataRequest_k_ELeaderboardDataRequestGlobal,
+            range_start.try_into().unwrap_or(i32::max_value()),
+            range_end.try_into().unwrap_or(i32::max_value()),
+            max_details,
+        )
+        .await
+    }
+
+    /// Fetches a sequential range of leaderboard entries by position relative to the current user's
+    /// rank.
+    ///
+    /// `range_start` and `range_end` are both inclusive. `max_details` should be 64 or less; higher
+    /// values will be clamped.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `range_end < range_start`.
+    pub async fn download_global_around_user(
+        &self,
         range_start: i32,
         range_end: i32,
         max_details: u8,
     ) -> Vec<LeaderboardEntry> {
-        match request_type {
-            LeaderboardDataRequest::Global => {
-                assert!(range_start > 0);
-                assert!(range_end >= range_start);
-            },
-            LeaderboardDataRequest::GlobalAroundUser => {
-                assert!(range_end >= range_start);
-            }
-            LeaderboardDataRequest::Friends => {}
-        }
+        assert!(range_end >= range_start);
 
+        self.download_entry_range(
+            sys::ELeaderboardDataRequest_k_ELeaderboardDataRequestGlobalAroundUser,
+            range_start,
+            range_end,
+            max_details,
+        )
+        .await
+    }
+
+    /// Fetches all leaderboard entries for friends of the current user.
+    ///
+    /// `max_details` should be 64 or less; higher values will be clamped.
+    pub async fn download_friends(&self, max_details: u8) -> Vec<LeaderboardEntry> {
+        self.download_entry_range(
+            sys::ELeaderboardDataRequest_k_ELeaderboardDataRequestFriends,
+            0,
+            0,
+            max_details,
+        )
+        .await
+    }
+
+    async fn download_entry_range(
+        &self,
+        request_type: sys::ELeaderboardDataRequest,
+        range_start: i32,
+        range_end: i32,
+        max_details: u8,
+    ) -> Vec<LeaderboardEntry> {
         let max_details = cmp::min(max_details, 64);
 
         let response: sys::LeaderboardScoresDownloaded_t = self
@@ -60,7 +102,7 @@ impl LeaderboardHandle {
                 sys::SteamAPI_ISteamUserStats_DownloadLeaderboardEntries(
                     self.client.0.user_stats as isize,
                     self.handle,
-                    request_type.into(),
+                    request_type,
                     range_start,
                     range_end,
                 )
@@ -97,23 +139,6 @@ impl LeaderboardHandle {
         }
 
         entries
-    }
-}
-
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
-pub enum LeaderboardDataRequest {
-    Global,
-    GlobalAroundUser,
-    Friends,
-}
-
-impl Into<sys::ELeaderboardDataRequest> for LeaderboardDataRequest {
-    fn into(self) -> sys::ELeaderboardDataRequest {
-        match self {
-            LeaderboardDataRequest::Global => 0,
-            LeaderboardDataRequest::GlobalAroundUser => 1,
-            LeaderboardDataRequest::Friends => 2,
-        }
     }
 }
 
