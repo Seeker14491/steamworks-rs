@@ -88,7 +88,9 @@ impl SteamId {
 impl From<u64> for SteamId {
     fn from(inner: u64) -> Self {
         SteamId(sys::CSteamID {
-            m_steamid: sys::CSteamID_SteamID_t { m_unAll64Bits: inner }
+            m_steamid: sys::CSteamID_SteamID_t {
+                m_unAll64Bits: inner,
+            },
         })
     }
 }
