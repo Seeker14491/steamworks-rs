@@ -27,8 +27,7 @@
     const_fn,
     gen_future,
     generators,
-    generator_trait,
-    maybe_uninit
+    generator_trait
 )]
 #![warn(
     rust_2018_idioms,
