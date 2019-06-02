@@ -2,7 +2,7 @@
 
 Futures-enabled bindings to a tiny portion of the Steamworks API.
 
-### [Docs](https://seeker14491.github.io/steamworks-rs)
+### [Docs](https://seeker14491.github.io/steamworks-rs/steamworks)
 
 ## Requirements
 
