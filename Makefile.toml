@@ -1,0 +1,5 @@
+[tasks.pre-release]
+dependencies = [
+    "check-format",
+    "test"
+]
