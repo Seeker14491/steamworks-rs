@@ -22,13 +22,7 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-#![feature(
-    async_await,
-    const_fn,
-    gen_future,
-    generators,
-    generator_trait
-)]
+#![feature(async_await, const_fn, gen_future, generators, generator_trait)]
 #![warn(
     rust_2018_idioms,
     deprecated_in_future,
