@@ -2,7 +2,7 @@
 
 Futures-enabled bindings to a tiny portion of the Steamworks API.
 
-The API is unstable; any commit is subject to break client code.
+### [Docs](https://seeker14491.github.io/steamworks-rs)
 
 ## Requirements
 
