@@ -259,6 +259,7 @@ pub struct QueryAllUgc {
     max_results: Option<u32>,
     match_any_tag: bool,
     tags: BTreeMap<CString, bool>,
+    return_long_description: bool,
 }
 
 impl QueryAllUgc {
@@ -272,6 +273,7 @@ impl QueryAllUgc {
             max_results: None,
             match_any_tag: false,
             tags: BTreeMap::new(),
+            return_long_description: false,
         }
     }
 
@@ -353,6 +355,14 @@ impl QueryAllUgc {
         self
     }
 
+    /// <https://partner.steamgames.com/doc/api/ISteamUGC#SetReturnLongDescription>
+    pub fn return_long_description(self) -> Self {
+        QueryAllUgc {
+            return_long_description: true,
+            ..self
+        }
+    }
+
     /// Executes the query.
     pub fn run(self) -> impl Stream<Item = Result<UgcDetails, QueryAllUgcError>> {
         GenTryStream::from(self.run_inner())
@@ -394,6 +404,9 @@ impl QueryAllUgc {
                 }
 
                 unsafe {
+                    let success = sys::SteamAPI_ISteamUGC_SetReturnLongDescription(ugc_instance, handle, self.return_long_description);
+                    assert!(success, "SetReturnLongDescription failed");
+
                     let success = sys::SteamAPI_ISteamUGC_SetMatchAnyTag(
                         ugc_instance,
                         handle,
