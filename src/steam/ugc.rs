@@ -5,6 +5,7 @@ use crate::{
     Client,
 };
 use chrono::{offset::TimeZone, DateTime, Utc};
+use derive_more::{From, Into};
 use enum_primitive_derive::Primitive;
 use futures::{Poll, Stream};
 use gen_stream::{gen_await, GenTryStream};
@@ -134,8 +135,8 @@ pub struct UgcDetails {
     pub num_children: u32,
 }
 
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
-pub struct PublishedFileId(sys::PublishedFileId_t);
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, From, Into)]
+pub struct PublishedFileId(pub u64);
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Primitive)]
 #[repr(i32)]
