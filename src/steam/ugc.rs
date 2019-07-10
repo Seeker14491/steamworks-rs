@@ -12,8 +12,8 @@ use gen_stream::{gen_await, GenTryStream};
 use num_traits::FromPrimitive;
 use snafu::ensure;
 use std::{
-    cmp, collections::BTreeMap, ffi::CString, mem::MaybeUninit, ops::Generator, os::raw::c_char,
-    ptr, str,
+    cmp, collections::BTreeMap, convert::TryFrom, ffi::CString, mem::MaybeUninit, ops::Generator,
+    os::raw::c_char, ptr, str,
 };
 use steamworks_sys as sys;
 
@@ -125,6 +125,7 @@ pub struct UgcDetails {
     pub tags: Tags,
     pub file: Option<UgcHandle>,
     pub preview_file: Option<UgcHandle>,
+    pub preview_url: String,
     pub file_name: String,
     pub file_size: i32,
     pub preview_file_size: i32,
@@ -463,6 +464,18 @@ impl QueryAllUgc {
                     };
                     assert!(success, "GetQueryUGCResult failed");
                     let details = unsafe { details.assume_init() };
+                    let preview_url = unsafe {
+                        let mut buf = vec![0_u8; 256];
+                        sys::SteamAPI_ISteamUGC_GetQueryUGCPreviewURL(
+                            ugc_instance,
+                            response.m_handle,
+                            i,
+                            buf.as_mut_ptr() as *mut c_char,
+                            u32::try_from(buf.len()).unwrap(),
+                        );
+                        String::from_utf8(buf)
+                            .expect("Workshop item's preview image URL is not valid UTF-8")
+                    };
                     let details = UgcDetails {
                         published_file_id: PublishedFileId(details.m_nPublishedFileId),
                         file_type: WorkshopFileType::from_inner(details.m_eFileType),
@@ -488,6 +501,7 @@ impl QueryAllUgc {
                         )),
                         file: UgcHandle::from_inner(details.m_hFile),
                         preview_file: UgcHandle::from_inner(details.m_hPreviewFile),
+                        preview_url,
                         file_name: crate::string_from_bytes_with_interior_null(
                             &details.m_pchFileName,
                         ),
