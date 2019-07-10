@@ -406,7 +406,11 @@ impl QueryAllUgc {
                 }
 
                 unsafe {
-                    let success = sys::SteamAPI_ISteamUGC_SetReturnLongDescription(ugc_instance, handle, self.return_long_description);
+                    let success = sys::SteamAPI_ISteamUGC_SetReturnLongDescription(
+                        ugc_instance,
+                        handle,
+                        self.return_long_description,
+                    );
                     assert!(success, "SetReturnLongDescription failed");
 
                     let success = sys::SteamAPI_ISteamUGC_SetMatchAnyTag(
