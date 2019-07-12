@@ -39,6 +39,7 @@
 pub mod callbacks;
 
 mod steam;
+mod string_ext;
 
 pub use steam::*;
 
@@ -50,9 +51,8 @@ use slotmap::HopSlotMap;
 use snafu::{ensure, Snafu};
 use std::{
     convert::TryInto,
-    ffi::{c_void, CStr},
+    ffi::c_void,
     mem::{self, MaybeUninit},
-    os::raw::c_char,
     sync::{
         atomic::{self, AtomicBool},
         Arc,
@@ -254,30 +254,4 @@ async fn sleep_ms_async(timer_handle: &timer::Handle, millis: u64) {
         .compat()
         .await
         .unwrap();
-}
-
-// The slice must contain at least one nul byte, and the contents of the slice prior to this byte
-// must be valid UTF-8.
-fn string_from_bytes_with_interior_null(s: &[c_char]) -> String {
-    let s = unsafe { &*(s as *const [c_char] as *const [u8]) };
-    let first_null = s
-        .iter()
-        .position(|x| *x == 0)
-        .expect("Slice does not contain any nul bytes") as usize;
-    let s = &s[0..=first_null];
-    let s = unsafe { CStr::from_bytes_with_nul_unchecked(s) };
-    s.to_owned()
-        .into_string()
-        .expect("Slice is not valid UTF-8")
-}
-
-#[test]
-fn test_string_from_bytes_with_interior_null() {
-    assert_eq!(string_from_bytes_with_interior_null(&[0]), "");
-    assert_eq!(string_from_bytes_with_interior_null(&[65, 0]), "A");
-    assert_eq!(string_from_bytes_with_interior_null(&[65, 66, 0, 67]), "AB");
-    assert_eq!(
-        string_from_bytes_with_interior_null(&[65, 66, 0, 67, 0]),
-        "AB"
-    );
 }

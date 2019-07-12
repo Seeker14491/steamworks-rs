@@ -2,6 +2,7 @@ pub use error::QueryAllUgcError;
 
 use crate::{
     steam::{AppId, SteamId, SteamResult, UgcHandle},
+    string_ext::FromUtf8NulTruncating,
     Client,
 };
 use chrono::{offset::TimeZone, DateTime, Utc};
@@ -477,17 +478,19 @@ impl QueryAllUgc {
                             buf.as_mut_ptr() as *mut c_char,
                             u32::try_from(buf.len()).unwrap(),
                         );
-                        String::from_utf8(buf)
+                        String::from_utf8_nul_truncating(buf)
                             .expect("Workshop item's preview image URL is not valid UTF-8")
                     };
                     let details = UgcDetails {
                         published_file_id: PublishedFileId(details.m_nPublishedFileId),
                         file_type: WorkshopFileType::from_inner(details.m_eFileType),
                         creator_app_id: AppId(details.m_nCreatorAppID),
-                        title: crate::string_from_bytes_with_interior_null(&details.m_rgchTitle),
-                        description: crate::string_from_bytes_with_interior_null(
-                            &details.m_rgchDescription,
-                        ),
+                        title: String::from_utf8_nul_truncating(&details.m_rgchTitle[..])
+                            .expect("Workshop item's title is not valid UTF-8"),
+                        description: String::from_utf8_nul_truncating(
+                            &details.m_rgchDescription[..],
+                        )
+                        .expect("Workshop item's description is not valid UTF-8"),
                         steam_id_owner: SteamId::from_u64_unchecked(details.m_ulSteamIDOwner),
                         time_created: Utc.timestamp(i64::from(details.m_rtimeCreated), 0),
                         time_updated: Utc.timestamp(i64::from(details.m_rtimeUpdated), 0),
@@ -500,18 +503,19 @@ impl QueryAllUgc {
                         banned: details.m_bBanned,
                         accepted_for_use: details.m_bAcceptedForUse,
                         tags_truncated: details.m_bTagsTruncated,
-                        tags: Tags(crate::string_from_bytes_with_interior_null(
-                            &details.m_rgchTags,
-                        )),
+                        tags: Tags(
+                            String::from_utf8_nul_truncating(&details.m_rgchTags[..])
+                                .expect("Workshop item's tags are not valid UTF-8"),
+                        ),
                         file: UgcHandle::from_inner(details.m_hFile),
                         preview_file: UgcHandle::from_inner(details.m_hPreviewFile),
                         preview_url,
-                        file_name: crate::string_from_bytes_with_interior_null(
-                            &details.m_pchFileName,
-                        ),
+                        file_name: String::from_utf8_nul_truncating(&details.m_pchFileName[..])
+                            .expect("Workshop item's file name is not valid UTF-8"),
                         file_size: details.m_nFileSize,
                         preview_file_size: details.m_nPreviewFileSize,
-                        url: crate::string_from_bytes_with_interior_null(&details.m_rgchURL),
+                        url: String::from_utf8_nul_truncating(&details.m_rgchURL[..])
+                            .expect("Workshop item's url is not valid UTF-8"),
                         votes_up: details.m_unVotesUp,
                         votes_down: details.m_unVotesDown,
                         score: details.m_flScore,
