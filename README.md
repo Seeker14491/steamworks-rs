@@ -11,6 +11,13 @@ Futures-enabled bindings to a tiny portion of the Steamworks API.
 
 Additionally, to run your binary that depends on this library, you will need to include the necessary `.dll`, `.dylib`, `.so` (depending on the platform) next to the executable. These are found in the `steamworks-sys\steamworks_sdk\redistributable_bin` directory. Note that this isn't necessary if you're running the executable through `cargo run`. Either way, you will probably need a `steam_appid.txt` file, as described in the [official docs](https://partner.steamgames.com/doc/sdk/api#SteamAPI_Init).
 
+Also, add the following to your crate's `.cargo/config` file to configure your compiled binary, on Unix platforms, to locate the Steamworks shared library next to the executable:
+
+```
+[target.'cfg(unix)']
+rustflags = ["-C", "link-arg=-Wl,-rpath,$ORIGIN"]
+```
+
 ## Credits
 
 - [@Thinkofname](https://github.com/Thinkofname): I took a portion of his build script for my use from [his Steamworks bindings](https://github.com/Thinkofname/steamworks-rs)
