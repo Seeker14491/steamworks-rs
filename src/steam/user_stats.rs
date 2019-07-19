@@ -1,11 +1,14 @@
-pub use error::LeaderboardNameError;
+pub use error::{LeaderboardNameError, UploadLeaderboardScoreError};
+use std::convert::TryFrom;
 
 use crate::{
     steam::{common::UgcHandle, SteamId},
     Client,
 };
+use futures::lock::Mutex;
+use lazy_static::lazy_static;
 use snafu::{ensure, ResultExt};
-use std::{cmp, convert::TryInto, ffi::CString, mem::MaybeUninit};
+use std::{cmp, convert::TryInto, ffi::CString, mem::MaybeUninit, ptr};
 use steamworks_sys as sys;
 
 /// A handle to a Steam leaderboard
@@ -87,6 +90,71 @@ impl LeaderboardHandle {
         .await
     }
 
+    /// Uploads a score to the leaderboard.
+    ///
+    /// `details` is optional game-specific information to upload along with the score. If
+    /// `force_update` is `true`, the user's score is updated to the new value, even if the new
+    /// score is not better than the already existing score (where "better" is defined by the
+    /// leaderboard sort method).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `details`, if provided, has a length greater than `64`.
+    pub async fn upload_leaderboard_score(
+        &self,
+        score: i32,
+        details: Option<&[i32]>,
+        force_update: bool,
+    ) -> Result<LeaderboardScoreUploaded, UploadLeaderboardScoreError> {
+        // Steamworks API: "you may only have one outstanding call to this function at a time"
+        lazy_static! {
+            static ref LOCK: Mutex<()> = Mutex::new(());
+        }
+
+        let leaderboard_upload_score_method = if force_update {
+            sys::ELeaderboardUploadScoreMethod_k_ELeaderboardUploadScoreMethodForceUpdate
+        } else {
+            sys::ELeaderboardUploadScoreMethod_k_ELeaderboardUploadScoreMethodKeepBest
+        };
+
+        let details_count = match details {
+            Some(xs) => {
+                let len = xs.len();
+                if len > 64 {
+                    panic!(format!("The details passed in to 'upload_leaderboard_score' has a length of {}, but the limit is 64", len));
+                }
+                i32::try_from(len).unwrap()
+            }
+            None => 0,
+        };
+
+        let _guard = LOCK.lock().await;
+
+        let response: sys::LeaderboardScoreUploaded_t = self
+            .client
+            .future_from_call_result_fn(sys::LeaderboardScoreUploaded_t_k_iCallback, || unsafe {
+                sys::SteamAPI_ISteamUserStats_UploadLeaderboardScore(
+                    self.client.0.user_stats as isize,
+                    self.handle,
+                    leaderboard_upload_score_method,
+                    score,
+                    details.map(|xs| xs.as_ptr()).unwrap_or(ptr::null()),
+                    details_count,
+                )
+            })
+            .await;
+
+        if response.m_bSuccess == 1 {
+            Ok(LeaderboardScoreUploaded {
+                score_changed: response.m_bScoreChanged != 0,
+                global_rank_new: response.m_nGlobalRankNew,
+                global_rank_previous: response.m_nGlobalRankPrevious,
+            })
+        } else {
+            Err(UploadLeaderboardScoreError)
+        }
+    }
+
     async fn download_entry_range(
         &self,
         request_type: sys::ELeaderboardDataRequest,
@@ -151,8 +219,20 @@ pub struct LeaderboardEntry {
     pub ugc: Option<UgcHandle>,
 }
 
+#[derive(Debug, Copy, Clone, Default, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub struct LeaderboardScoreUploaded {
+    pub score_changed: bool,
+    pub global_rank_new: i32,
+    pub global_rank_previous: i32,
+}
+
 mod error {
-    #[derive(Debug, snafu::Snafu)]
+    use std::{
+        error::Error,
+        fmt::{self, Display},
+    };
+
+    #[derive(Debug, Clone, Eq, PartialEq, snafu::Snafu)]
     #[snafu(visibility(pub(crate)))]
     pub enum LeaderboardNameError {
         /// The leaderboard name contains nul byte(s)
@@ -167,6 +247,20 @@ mod error {
         ))]
         TooLong { length: usize },
     }
+
+    #[derive(Debug, Copy, Clone, Default, Hash, Eq, PartialEq, Ord, PartialOrd)]
+    pub struct UploadLeaderboardScoreError;
+
+    impl Display for UploadLeaderboardScoreError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+            write!(
+                f,
+                "A call to the Steamworks function 'UploadLeaderboardScore()' failed"
+            )
+        }
+    }
+
+    impl Error for UploadLeaderboardScoreError {}
 }
 
 pub(crate) async fn find_leaderboard(
