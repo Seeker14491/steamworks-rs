@@ -2,6 +2,7 @@
 #include "steam_api_flat.h"
 
 ISteamFriends* steam_rust_get_friends();
+ISteamUser* steam_rust_get_user();
 ISteamUserStats* steam_rust_get_user_stats();
 ISteamUGC* steam_rust_get_ugc();
 ISteamUtils* steam_rust_get_utils();

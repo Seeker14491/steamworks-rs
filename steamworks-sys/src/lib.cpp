@@ -1,6 +1,7 @@
 #include "../wrapper.hpp"
 
 ISteamFriends* steam_rust_get_friends() { return SteamFriends(); }
+ISteamUser* steam_rust_get_user() { return SteamUser(); }
 ISteamUserStats* steam_rust_get_user_stats() { return SteamUserStats(); }
 ISteamUGC* steam_rust_get_ugc() { return SteamUGC(); }
 ISteamUtils* steam_rust_get_utils() { return SteamUtils(); }

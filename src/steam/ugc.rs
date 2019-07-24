@@ -491,7 +491,7 @@ impl QueryAllUgc {
                             &details.m_rgchDescription[..],
                         )
                         .expect("Workshop item's description is not valid UTF-8"),
-                        steam_id_owner: SteamId::from_u64_unchecked(details.m_ulSteamIDOwner),
+                        steam_id_owner: details.m_ulSteamIDOwner.into(),
                         time_created: Utc.timestamp(i64::from(details.m_rtimeCreated), 0),
                         time_updated: Utc.timestamp(i64::from(details.m_rtimeUpdated), 0),
                         time_added_to_user_list: if details.m_rtimeAddedToUserList == 0 {

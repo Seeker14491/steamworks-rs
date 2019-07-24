@@ -75,14 +75,6 @@ impl SteamId {
     pub fn as_u64(self) -> u64 {
         self.into()
     }
-
-    pub(crate) fn from_u64_unchecked(x: u64) -> Self {
-        let steam_id = sys::CSteamID {
-            m_steamid: sys::CSteamID_SteamID_t { m_unAll64Bits: x },
-        };
-
-        SteamId(steam_id)
-    }
 }
 
 impl From<u64> for SteamId {

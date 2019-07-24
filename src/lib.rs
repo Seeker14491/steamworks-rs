@@ -78,6 +78,7 @@ struct ClientInner {
     thread_shutdown: Sender<()>,
     callback_manager: *mut sys::CallbackManager,
     friends: *mut sys::ISteamFriends,
+    user: *mut sys::ISteamUser,
     user_stats: *mut sys::ISteamUserStats,
     ugc: *mut sys::ISteamUGC,
     utils: *mut sys::ISteamUtils,
@@ -136,6 +137,7 @@ impl Client {
                 thread_shutdown: shutdown_tx,
                 callback_manager,
                 friends: sys::steam_rust_get_friends(),
+                user: sys::steam_rust_get_user(),
                 user_stats: sys::steam_rust_get_user_stats(),
                 ugc: sys::steam_rust_get_ugc(),
                 utils: sys::steam_rust_get_utils(),
@@ -163,6 +165,13 @@ impl Client {
     /// <https://partner.steamgames.com/doc/api/ISteamUtils#GetAppID>
     pub fn app_id(&self) -> AppId {
         unsafe { sys::SteamAPI_ISteamUtils_GetAppID(self.0.utils as isize).into() }
+    }
+
+    /// <https://partner.steamgames.com/doc/api/ISteamUser#GetSteamID>
+    pub fn steam_id(&self) -> SteamId {
+        let id = unsafe { sys::SteamAPI_ISteamUser_GetSteamID(self.0.user as isize) };
+
+        id.into()
     }
 
     /// <https://partner.steamgames.com/doc/api/ISteamFriends#PersonaStateChange_t>

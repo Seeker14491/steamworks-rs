@@ -42,7 +42,7 @@ pub(crate) static PERSONA_STATE_CHANGED: CallbackStorage<PersonaStateChange> =
 pub(crate) unsafe extern "C" fn on_persona_state_changed(params: *mut sys::PersonaStateChange_t) {
     let params = *params;
     let params = PersonaStateChange {
-        steam_id: SteamId::from_u64_unchecked(params.m_ulSteamID),
+        steam_id: params.m_ulSteamID.into(),
         change_flags: PersonaStateChangeFlags::from_bits_truncate(params.m_nChangeFlags as u32),
     };
 
