@@ -2,7 +2,7 @@ pub use error::{LeaderboardNameError, UploadLeaderboardScoreError};
 use std::convert::TryFrom;
 
 use crate::{
-    steam::{common::UgcHandle, SteamId},
+    steam::{remote_storage::UgcHandle, SteamId},
     Client,
 };
 use futures::lock::Mutex;

@@ -1,7 +1,7 @@
 pub use error::QueryAllUgcError;
 
 use crate::{
-    steam::{AppId, SteamId, SteamResult, UgcHandle},
+    steam::{remote_storage::UgcHandle, AppId, SteamId, SteamResult},
     string_ext::FromUtf8NulTruncating,
     Client,
 };

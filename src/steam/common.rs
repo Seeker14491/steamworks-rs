@@ -113,23 +113,6 @@ impl Hash for SteamId {
     }
 }
 
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
-pub struct UgcHandle(sys::UGCHandle_t);
-
-impl UgcHandle {
-    pub(crate) fn from_inner(handle: sys::UGCHandle_t) -> Option<Self> {
-        if handle == sys::k_UGCHandleInvalid {
-            None
-        } else {
-            Some(UgcHandle(handle))
-        }
-    }
-
-    pub(crate) fn to_inner(self) -> sys::UGCHandle_t {
-        self.0
-    }
-}
-
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Primitive)]
 #[repr(i32)]
 pub enum SteamResult {

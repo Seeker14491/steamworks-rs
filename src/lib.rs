@@ -78,9 +78,10 @@ struct ClientInner {
     thread_shutdown: Sender<()>,
     callback_manager: *mut sys::CallbackManager,
     friends: *mut sys::ISteamFriends,
+    remote_storage: *mut sys::ISteamRemoteStorage,
+    ugc: *mut sys::ISteamUGC,
     user: *mut sys::ISteamUser,
     user_stats: *mut sys::ISteamUserStats,
-    ugc: *mut sys::ISteamUGC,
     utils: *mut sys::ISteamUtils,
 }
 
@@ -137,9 +138,10 @@ impl Client {
                 thread_shutdown: shutdown_tx,
                 callback_manager,
                 friends: sys::steam_rust_get_friends(),
+                remote_storage: sys::steam_rust_get_remote_storage(),
+                ugc: sys::steam_rust_get_ugc(),
                 user: sys::steam_rust_get_user(),
                 user_stats: sys::steam_rust_get_user_stats(),
-                ugc: sys::steam_rust_get_ugc(),
                 utils: sys::steam_rust_get_utils(),
             })))
         }
