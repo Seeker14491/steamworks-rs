@@ -252,9 +252,11 @@ impl CallResultMagicNumber for u32 {
 
 #[derive(Debug, Snafu)]
 pub enum InitError {
+    /// Tried to initialize Steam API when it was already initialized
     #[snafu(display("Tried to initialize Steam API when it was already initialized"))]
     AlreadyInitialized,
 
+    /// The Steamworks API failed to initialize (SteamAPI_Init() returned false)
     #[snafu(display("The Steamworks API failed to initialize (SteamAPI_Init() returned false)"))]
     Other,
 }
