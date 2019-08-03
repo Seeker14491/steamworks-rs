@@ -1,4 +1,4 @@
-pub use error::{LeaderboardNameError, UploadLeaderboardScoreError};
+pub use error::{FindLeaderboardError, UploadLeaderboardScoreError};
 use std::convert::TryFrom;
 
 use crate::{
@@ -234,7 +234,7 @@ mod error {
 
     #[derive(Debug, Clone, Eq, PartialEq, snafu::Snafu)]
     #[snafu(visibility(pub(crate)))]
-    pub enum LeaderboardNameError {
+    pub enum FindLeaderboardError {
         /// The leaderboard name contains nul byte(s)
         #[snafu(display("The leaderboard name contains nul byte(s): {}", source))]
         Nul { source: std::ffi::NulError },
@@ -246,6 +246,10 @@ mod error {
             steamworks_sys::k_cchLeaderboardNameMax
         ))]
         TooLong { length: usize },
+
+        /// The leaderboard was not found
+        #[snafu(display("The leaderboard was not found"))]
+        NotFound,
     }
 
     #[derive(Debug, Copy, Clone, Default, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -266,7 +270,7 @@ mod error {
 pub(crate) async fn find_leaderboard(
     client: &Client,
     leaderboard_name: impl Into<Vec<u8>>,
-) -> Result<Option<LeaderboardHandle>, LeaderboardNameError> {
+) -> Result<LeaderboardHandle, FindLeaderboardError> {
     let leaderboard_name = CString::new(leaderboard_name).context(error::Nul)?;
     let leaderboard_name = leaderboard_name.as_bytes_with_nul();
     ensure!(
@@ -285,12 +289,10 @@ pub(crate) async fn find_leaderboard(
         })
         .await;
 
-    Ok(if response.m_bLeaderboardFound != 0 {
-        Some(LeaderboardHandle {
-            client: client.clone(),
-            handle: response.m_hSteamLeaderboard,
-        })
-    } else {
-        None
+    ensure!(response.m_bLeaderboardFound != 0, error::NotFound);
+
+    Ok(LeaderboardHandle {
+        client: client.clone(),
+        handle: response.m_hSteamLeaderboard,
     })
 }

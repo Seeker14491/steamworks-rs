@@ -149,12 +149,12 @@ impl Client {
 
     /// <https://partner.steamgames.com/doc/api/ISteamUserStats#FindLeaderboard>
     ///
-    /// Returns an error if the leaderboard name contains nul bytes or is longer than 128 bytes.
-    /// Returns `Ok(None)` if the leaderboard is not found.
+    /// Returns an error if the leaderboard name contains nul bytes, is longer than 128 bytes, or if
+    /// the leaderboard is not found.
     pub async fn find_leaderboard(
         &self,
         leaderboard_name: impl Into<Vec<u8>>,
-    ) -> Result<Option<user_stats::LeaderboardHandle>, user_stats::LeaderboardNameError> {
+    ) -> Result<user_stats::LeaderboardHandle, user_stats::FindLeaderboardError> {
         user_stats::find_leaderboard(self, leaderboard_name).await
     }
 
