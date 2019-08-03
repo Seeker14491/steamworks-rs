@@ -449,12 +449,13 @@ impl QueryAllUgc {
 
                 {
                     let result = SteamResult::from_inner(response.m_eResult);
-                    if result != SteamResult::OK {
-                        return error::SendQueryUGCRequest {
+
+                    ensure!(
+                        result == SteamResult::OK,
+                        error::SendQueryUGCRequest {
                             steam_result: result,
                         }
-                        .fail();
-                    }
+                    );
                 }
 
                 let items_to_reach_quota = max_results - details_returned;
