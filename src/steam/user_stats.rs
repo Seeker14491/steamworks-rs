@@ -247,9 +247,9 @@ mod error {
         ))]
         TooLong { length: usize },
 
-        /// The leaderboard was not found
-        #[snafu(display("The leaderboard was not found"))]
-        NotFound,
+        /// The specified leaderboard was not found
+        #[snafu(display("The leaderboard '{:?}' was not found", leaderboard_name))]
+        NotFound { leaderboard_name: std::ffi::CString },
     }
 
     #[derive(Debug, Copy, Clone, Default, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -272,11 +272,11 @@ pub(crate) async fn find_leaderboard(
     leaderboard_name: impl Into<Vec<u8>>,
 ) -> Result<LeaderboardHandle, FindLeaderboardError> {
     let leaderboard_name = CString::new(leaderboard_name).context(error::Nul)?;
-    let leaderboard_name = leaderboard_name.as_bytes_with_nul();
+    let leaderboard_name_bytes = leaderboard_name.as_bytes_with_nul();
     ensure!(
-        leaderboard_name.len() - 1 <= sys::k_cchLeaderboardNameMax as usize,
+        leaderboard_name_bytes.len() - 1 <= sys::k_cchLeaderboardNameMax as usize,
         error::TooLong {
-            length: leaderboard_name.len() - 1
+            length: leaderboard_name_bytes.len() - 1
         }
     );
 
@@ -284,12 +284,15 @@ pub(crate) async fn find_leaderboard(
         .future_from_call_result_fn(sys::LeaderboardFindResult_t_k_iCallback, || unsafe {
             sys::SteamAPI_ISteamUserStats_FindLeaderboard(
                 client.0.user_stats as isize,
-                leaderboard_name.as_ptr() as *const i8,
+                leaderboard_name_bytes.as_ptr() as *const i8,
             )
         })
         .await;
 
-    ensure!(response.m_bLeaderboardFound != 0, error::NotFound);
+    ensure!(
+        response.m_bLeaderboardFound != 0,
+        error::NotFound { leaderboard_name }
+    );
 
     Ok(LeaderboardHandle {
         client: client.clone(),
