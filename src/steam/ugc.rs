@@ -169,14 +169,16 @@ impl WorkshopFileType {
     }
 }
 
+#[cfg_attr(rustfmt, rustfmt_skip)] // rustfmt bug prevents formating this
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Primitive)]
 #[repr(i32)]
 pub enum PublishedFileVisibility {
     Public =
-        sys::ERemoteStoragePublishedFileVisibility_k_ERemoteStoragePublishedFileVisibilityPublic,
-    FriendsOnly = sys::ERemoteStoragePublishedFileVisibility_k_ERemoteStoragePublishedFileVisibilityFriendsOnly,
+    sys::ERemoteStoragePublishedFileVisibility_k_ERemoteStoragePublishedFileVisibilityPublic as i32,
+    FriendsOnly =
+    sys::ERemoteStoragePublishedFileVisibility_k_ERemoteStoragePublishedFileVisibilityFriendsOnly as i32,
     Private =
-        sys::ERemoteStoragePublishedFileVisibility_k_ERemoteStoragePublishedFileVisibilityPrivate,
+    sys::ERemoteStoragePublishedFileVisibility_k_ERemoteStoragePublishedFileVisibilityPrivate as i32,
 }
 
 impl PublishedFileVisibility {
