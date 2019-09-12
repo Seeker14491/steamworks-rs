@@ -169,7 +169,6 @@ impl WorkshopFileType {
     }
 }
 
-#[cfg_attr(rustfmt, rustfmt_skip)] // rustfmt bug prevents formating this
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Primitive)]
 #[repr(i32)]
 pub enum PublishedFileVisibility {
