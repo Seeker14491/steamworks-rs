@@ -3,6 +3,7 @@ use enum_primitive_derive::Primitive;
 use futures::StreamExt;
 use num_traits::FromPrimitive;
 use std::{
+    cmp::Ordering,
     ffi::CStr,
     fmt::{self, Debug, Display, Formatter},
     hash::{Hash, Hasher},
@@ -113,7 +114,19 @@ impl Hash for SteamId {
     }
 }
 
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Primitive)]
+impl PartialOrd for SteamId {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.as_u64().partial_cmp(&other.as_u64())
+    }
+}
+
+impl Ord for SteamId {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.as_u64().cmp(&other.as_u64())
+    }
+}
+
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Primitive)]
 #[repr(i32)]
 pub enum SteamResult {
     OK = sys::EResult_k_EResultOK as i32,

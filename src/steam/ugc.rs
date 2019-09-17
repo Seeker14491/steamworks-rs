@@ -18,7 +18,7 @@ use std::{
 };
 use steamworks_sys as sys;
 
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum QueryType {
     RankedByVote,
     RankedByPublicationDate,
@@ -47,7 +47,7 @@ impl From<QueryType> for sys::EUGCQuery {
     }
 }
 
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Primitive)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Primitive)]
 #[repr(i32)]
 pub enum MatchingUgcType {
     Items = sys::EUGCMatchingUGCType_k_EUGCMatchingUGCType_Items,
@@ -137,10 +137,10 @@ pub struct UgcDetails {
     pub num_children: u32,
 }
 
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, From, Into)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, From, Into)]
 pub struct PublishedFileId(pub u64);
 
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Primitive)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Primitive)]
 #[repr(i32)]
 pub enum WorkshopFileType {
     Community = sys::EWorkshopFileType_k_EWorkshopFileTypeCommunity as i32,
@@ -169,7 +169,7 @@ impl WorkshopFileType {
     }
 }
 
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Primitive)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Primitive)]
 #[repr(i32)]
 pub enum PublishedFileVisibility {
     Public =

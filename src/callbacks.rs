@@ -9,7 +9,7 @@ pub(crate) type CallbackStorage<T> = state::Storage<
 >;
 
 /// <https://partner.steamgames.com/doc/api/ISteamFriends#PersonaStateChange_t>
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct PersonaStateChange {
     pub steam_id: SteamId,
     pub change_flags: PersonaStateChangeFlags,

@@ -5,7 +5,7 @@ use snafu::{ensure, ResultExt};
 use std::ffi::CString;
 use steamworks_sys as sys;
 
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct UgcHandle(sys::UGCHandle_t);
 
 impl UgcHandle {
@@ -67,7 +67,7 @@ impl UgcHandle {
     }
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct DownloadUGCResult {
     app_id: AppId,
     size_in_bytes: i32,

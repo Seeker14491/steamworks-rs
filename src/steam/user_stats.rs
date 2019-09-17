@@ -210,7 +210,7 @@ impl LeaderboardHandle {
     }
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct LeaderboardEntry {
     pub steam_id: SteamId,
     pub global_rank: i32,
