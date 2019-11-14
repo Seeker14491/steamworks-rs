@@ -6,7 +6,7 @@ use crate::{
     Client,
 };
 use futures::lock::Mutex;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use snafu::{ensure, ResultExt};
 use std::{cmp, convert::TryInto, ffi::CString, mem::MaybeUninit, ptr};
 use steamworks_sys as sys;
@@ -107,9 +107,7 @@ impl LeaderboardHandle {
         force_update: bool,
     ) -> Result<LeaderboardScoreUploaded, UploadLeaderboardScoreError> {
         // Steamworks API: "you may only have one outstanding call to this function at a time"
-        lazy_static! {
-            static ref LOCK: Mutex<()> = Mutex::new(());
-        }
+        static LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
         let leaderboard_upload_score_method = if force_update {
             sys::ELeaderboardUploadScoreMethod_k_ELeaderboardUploadScoreMethodForceUpdate

@@ -22,7 +22,7 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-#![feature(const_fn, gen_future, generators, generator_trait)]
+#![feature(generators)]
 #![warn(
     rust_2018_idioms,
     deprecated_in_future,
@@ -33,8 +33,7 @@
     unused_qualifications,
     clippy::cast_possible_truncation
 )]
-#![allow(clippy::needless_lifetimes)] // false positives when used with async functions
-#![allow(clippy::deprecated_cfg_attr, dead_code)]
+#![allow(dead_code)]
 
 pub mod callbacks;
 
@@ -44,10 +43,9 @@ mod string_ext;
 pub use steam::*;
 
 use crate::callbacks::CallbackStorage;
+use async_std::task;
 use crossbeam_channel::Sender;
-use futures::{compat::Future01CompatExt, Stream};
-use parking_lot::Mutex;
-use slotmap::HopSlotMap;
+use futures::Stream;
 use snafu::{ensure, Snafu};
 use std::{
     convert::TryInto,
@@ -58,11 +56,9 @@ use std::{
         Arc,
     },
     thread,
-    time::{Duration, Instant},
+    time::Duration,
 };
 use steamworks_sys as sys;
-use tokio_executor::park::ParkThread;
-use tokio_timer::{timer, Timer};
 
 static STEAM_API_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
@@ -74,7 +70,6 @@ pub struct Client(Arc<ClientInner>);
 
 #[derive(Debug)]
 struct ClientInner {
-    timer_handle: timer::Handle,
     thread_shutdown: Sender<()>,
     callback_manager: *mut sys::CallbackManager,
     friends: *mut sys::ISteamFriends,
@@ -112,29 +107,19 @@ impl Client {
             })
         };
 
-        callbacks::PERSONA_STATE_CHANGED.set(Mutex::new(HopSlotMap::new()));
-        callbacks::STEAM_SHUTDOWN.set(Mutex::new(HopSlotMap::new()));
-
-        let (timer_tx, timer_rx) = crossbeam_channel::bounded(0);
         let (shutdown_tx, shutdown_rx) = crossbeam_channel::bounded(0);
-        thread::spawn(move || {
-            let mut timer = Timer::new(ParkThread::new());
-            timer_tx.send(timer.handle()).unwrap();
+        thread::spawn(move || loop {
+            unsafe { sys::SteamAPI_RunCallbacks() }
 
-            loop {
-                timer.turn(Some(Duration::from_millis(5))).unwrap();
-
-                unsafe { sys::SteamAPI_RunCallbacks() }
-
-                if let Ok(()) = shutdown_rx.try_recv() {
-                    break;
-                }
+            if let Ok(()) = shutdown_rx.try_recv() {
+                break;
             }
+
+            thread::sleep(Duration::from_millis(1));
         });
 
         unsafe {
             Ok(Client(Arc::new(ClientInner {
-                timer_handle: timer_rx.recv().unwrap(),
                 thread_shutdown: shutdown_tx,
                 callback_manager,
                 friends: sys::steam_rust_get_friends(),
@@ -196,7 +181,7 @@ impl Client {
         while failed {
             let api_call = make_call();
             loop {
-                sleep_ms_async(&self.0.timer_handle, 5).await;
+                task::sleep(Duration::from_millis(5)).await;
                 let completed = unsafe {
                     sys::SteamAPI_ISteamUtils_GetAPICallResult(
                         self.0.utils as isize,
@@ -219,7 +204,7 @@ impl Client {
 
     fn get_callback_stream<T: Send>(&self, storage: &CallbackStorage<T>) -> impl Stream<Item = T> {
         let (tx, rx) = futures::channel::mpsc::unbounded();
-        storage.get().lock().insert(tx);
+        storage.lock().insert(tx);
         rx
     }
 }
@@ -259,12 +244,4 @@ pub enum InitError {
     /// The Steamworks API failed to initialize (SteamAPI_Init() returned false)
     #[snafu(display("The Steamworks API failed to initialize (SteamAPI_Init() returned false)"))]
     Other,
-}
-
-async fn sleep_ms_async(timer_handle: &timer::Handle, millis: u64) {
-    timer_handle
-        .delay(Instant::now() + Duration::from_millis(millis))
-        .compat()
-        .await
-        .unwrap();
 }

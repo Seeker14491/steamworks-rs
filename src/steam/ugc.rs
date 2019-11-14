@@ -8,13 +8,12 @@ use crate::{
 use chrono::{offset::TimeZone, DateTime, Utc};
 use derive_more::{From, Into};
 use enum_primitive_derive::Primitive;
-use futures::{Poll, Stream};
-use gen_stream::{gen_await, GenTryStream};
+use futures_async_stream::async_try_stream;
 use num_traits::FromPrimitive;
 use snafu::ensure;
 use std::{
-    cmp, collections::BTreeMap, convert::TryFrom, ffi::CString, mem::MaybeUninit, ops::Generator,
-    os::raw::c_char, ptr, str,
+    cmp, collections::BTreeMap, convert::TryFrom, ffi::CString, mem::MaybeUninit, os::raw::c_char,
+    ptr, str,
 };
 use steamworks_sys as sys;
 
@@ -369,184 +368,164 @@ impl QueryAllUgc {
     }
 
     /// Executes the query.
-    pub fn run(self) -> impl Stream<Item = Result<UgcDetails, QueryAllUgcError>> {
-        GenTryStream::from(self.run_inner())
-    }
+    #[async_try_stream(ok = UgcDetails, error = QueryAllUgcError)]
+    pub async fn run(self) {
+        let current_app_id = self.client.app_id();
+        if let (Some(x), Some(y)) = (self.creator_app_id, self.consumer_app_id) {
+            ensure!(x == current_app_id || y == current_app_id, error::AppId)
+        }
 
-    fn run_inner(
-        self,
-    ) -> impl Generator<Yield = Poll<UgcDetails>, Return = Result<(), QueryAllUgcError>> {
-        static move || {
-            let current_app_id = self.client.app_id();
-            if let (Some(x), Some(y)) = (self.creator_app_id, self.consumer_app_id) {
-                ensure!(x == current_app_id || y == current_app_id, error::AppId)
+        let max_results = self.max_results.unwrap_or(u32::max_value());
+
+        let ugc_instance = self.client.0.ugc as isize;
+        let mut cursor: Option<Vec<c_char>> = None;
+        let mut details_returned = 0;
+        loop {
+            let handle = unsafe {
+                let pointer = match &cursor {
+                    Some(x) => x.as_ptr(),
+                    None => ptr::null(),
+                };
+                sys::SteamAPI_ISteamUGC_CreateQueryAllUGCRequest0(
+                    ugc_instance,
+                    self.query_type.into(),
+                    self.matching_ugc_type.into(),
+                    self.creator_app_id.unwrap_or_else(|| current_app_id).into(),
+                    self.consumer_app_id
+                        .unwrap_or_else(|| current_app_id)
+                        .into(),
+                    pointer,
+                )
+            };
+            if handle == sys::k_UGCQueryHandleInvalid {
+                return error::CreateQueryAllUGCRequest.fail();
             }
 
-            let max_results = self.max_results.unwrap_or(u32::max_value());
+            unsafe {
+                let success = sys::SteamAPI_ISteamUGC_SetReturnLongDescription(
+                    ugc_instance,
+                    handle,
+                    self.return_long_description,
+                );
+                assert!(success, "SetReturnLongDescription failed");
 
-            let ugc_instance = self.client.0.ugc as isize;
-            let mut cursor: Option<Vec<c_char>> = None;
-            let mut details_returned = 0;
-            loop {
-                let handle = unsafe {
-                    let pointer = match &cursor {
-                        Some(x) => x.as_ptr(),
-                        None => ptr::null(),
-                    };
-                    sys::SteamAPI_ISteamUGC_CreateQueryAllUGCRequest0(
+                let success = sys::SteamAPI_ISteamUGC_SetMatchAnyTag(
+                    ugc_instance,
+                    handle,
+                    self.match_any_tag,
+                );
+                assert!(success, "SetMatchAnyTag failed");
+
+                for (tag, required) in &self.tags {
+                    if *required {
+                        sys::SteamAPI_ISteamUGC_AddRequiredTag(ugc_instance, handle, tag.as_ptr());
+                    } else {
+                        sys::SteamAPI_ISteamUGC_AddExcludedTag(ugc_instance, handle, tag.as_ptr());
+                    }
+                }
+            }
+
+            let response: sys::SteamUGCQueryCompleted_t = self
+                .client
+                .future_from_call_result_fn(sys::SteamUGCQueryCompleted_t_k_iCallback, || unsafe {
+                    sys::SteamAPI_ISteamUGC_SendQueryUGCRequest(ugc_instance, handle)
+                })
+                .await;
+
+            {
+                let result = SteamResult::from_inner(response.m_eResult);
+
+                ensure!(
+                    result == SteamResult::OK,
+                    error::SendQueryUGCRequest {
+                        steam_result: result,
+                    }
+                );
+            }
+
+            let items_to_reach_quota = max_results - details_returned;
+            for i in 0..cmp::min(items_to_reach_quota, response.m_unNumResultsReturned) {
+                let mut details: MaybeUninit<sys::SteamUGCDetails_t> = MaybeUninit::uninit();
+                let success = unsafe {
+                    sys::SteamAPI_ISteamUGC_GetQueryUGCResult(
                         ugc_instance,
-                        self.query_type.into(),
-                        self.matching_ugc_type.into(),
-                        self.creator_app_id.unwrap_or_else(|| current_app_id).into(),
-                        self.consumer_app_id
-                            .unwrap_or_else(|| current_app_id)
-                            .into(),
-                        pointer,
+                        response.m_handle,
+                        i,
+                        details.as_mut_ptr(),
                     )
                 };
-                if handle == sys::k_UGCQueryHandleInvalid {
-                    return error::CreateQueryAllUGCRequest.fail();
-                }
-
-                unsafe {
-                    let success = sys::SteamAPI_ISteamUGC_SetReturnLongDescription(
+                assert!(success, "GetQueryUGCResult failed");
+                let details = unsafe { details.assume_init() };
+                let preview_url = unsafe {
+                    let mut buf = vec![0_u8; 256];
+                    sys::SteamAPI_ISteamUGC_GetQueryUGCPreviewURL(
                         ugc_instance,
-                        handle,
-                        self.return_long_description,
+                        response.m_handle,
+                        i,
+                        buf.as_mut_ptr() as *mut c_char,
+                        u32::try_from(buf.len()).unwrap(),
                     );
-                    assert!(success, "SetReturnLongDescription failed");
-
-                    let success = sys::SteamAPI_ISteamUGC_SetMatchAnyTag(
-                        ugc_instance,
-                        handle,
-                        self.match_any_tag,
-                    );
-                    assert!(success, "SetMatchAnyTag failed");
-
-                    for (tag, required) in &self.tags {
-                        if *required {
-                            sys::SteamAPI_ISteamUGC_AddRequiredTag(
-                                ugc_instance,
-                                handle,
-                                tag.as_ptr(),
-                            );
-                        } else {
-                            sys::SteamAPI_ISteamUGC_AddExcludedTag(
-                                ugc_instance,
-                                handle,
-                                tag.as_ptr(),
-                            );
-                        }
-                    }
-                }
-
-                let response: sys::SteamUGCQueryCompleted_t =
-                    gen_await!(self.client.future_from_call_result_fn(
-                        sys::SteamUGCQueryCompleted_t_k_iCallback,
-                        || unsafe {
-                            sys::SteamAPI_ISteamUGC_SendQueryUGCRequest(ugc_instance, handle)
-                        }
-                    ));
-
-                {
-                    let result = SteamResult::from_inner(response.m_eResult);
-
-                    ensure!(
-                        result == SteamResult::OK,
-                        error::SendQueryUGCRequest {
-                            steam_result: result,
-                        }
-                    );
-                }
-
-                let items_to_reach_quota = max_results - details_returned;
-                for i in 0..cmp::min(items_to_reach_quota, response.m_unNumResultsReturned) {
-                    let mut details: MaybeUninit<sys::SteamUGCDetails_t> = MaybeUninit::uninit();
-                    let success = unsafe {
-                        sys::SteamAPI_ISteamUGC_GetQueryUGCResult(
-                            ugc_instance,
-                            response.m_handle,
-                            i,
-                            details.as_mut_ptr(),
-                        )
-                    };
-                    assert!(success, "GetQueryUGCResult failed");
-                    let details = unsafe { details.assume_init() };
-                    let preview_url = unsafe {
-                        let mut buf = vec![0_u8; 256];
-                        sys::SteamAPI_ISteamUGC_GetQueryUGCPreviewURL(
-                            ugc_instance,
-                            response.m_handle,
-                            i,
-                            buf.as_mut_ptr() as *mut c_char,
-                            u32::try_from(buf.len()).unwrap(),
-                        );
-                        String::from_utf8_nul_truncating(buf)
-                            .expect("Workshop item's preview image URL is not valid UTF-8")
-                    };
-                    let details = UgcDetails {
-                        published_file_id: PublishedFileId(details.m_nPublishedFileId),
-                        file_type: WorkshopFileType::from_inner(details.m_eFileType),
-                        creator_app_id: AppId(details.m_nCreatorAppID),
-                        title: String::from_utf8_nul_truncating(&details.m_rgchTitle[..])
-                            .expect("Workshop item's title is not valid UTF-8"),
-                        description: String::from_utf8_nul_truncating(
-                            &details.m_rgchDescription[..],
-                        )
-                        .expect("Workshop item's description is not valid UTF-8"),
-                        steam_id_owner: details.m_ulSteamIDOwner.into(),
-                        time_created: Utc.timestamp(i64::from(details.m_rtimeCreated), 0),
-                        time_updated: Utc.timestamp(i64::from(details.m_rtimeUpdated), 0),
-                        time_added_to_user_list: if details.m_rtimeAddedToUserList == 0 {
-                            None
-                        } else {
-                            Some(Utc.timestamp(i64::from(details.m_rtimeAddedToUserList), 0))
-                        },
-                        visibility: PublishedFileVisibility::from_inner(details.m_eVisibility),
-                        banned: details.m_bBanned,
-                        accepted_for_use: details.m_bAcceptedForUse,
-                        tags_truncated: details.m_bTagsTruncated,
-                        tags: Tags(
-                            String::from_utf8_nul_truncating(&details.m_rgchTags[..])
-                                .expect("Workshop item's tags are not valid UTF-8"),
-                        ),
-                        file: UgcHandle::from_inner(details.m_hFile),
-                        preview_file: UgcHandle::from_inner(details.m_hPreviewFile),
-                        preview_url,
-                        file_name: String::from_utf8_nul_truncating(&details.m_pchFileName[..])
-                            .expect("Workshop item's file name is not valid UTF-8"),
-                        file_size: details.m_nFileSize,
-                        preview_file_size: details.m_nPreviewFileSize,
-                        url: String::from_utf8_nul_truncating(&details.m_rgchURL[..])
-                            .expect("Workshop item's url is not valid UTF-8"),
-                        votes_up: details.m_unVotesUp,
-                        votes_down: details.m_unVotesDown,
-                        score: details.m_flScore,
-                        num_children: details.m_unNumChildren,
-                    };
-
-                    yield Poll::Ready(details);
-                    details_returned += 1;
-                }
-
-                unsafe { sys::SteamAPI_ISteamUGC_ReleaseQueryUGCRequest(ugc_instance, handle) };
-
-                let more_items_wanted = items_to_reach_quota > 0;
-                let more_items_available = response.m_unTotalMatchingResults > details_returned;
-                if !more_items_wanted || !more_items_available {
-                    break;
-                }
-
-                cursor = match cursor {
-                    Some(mut x) => {
-                        x.copy_from_slice(&response.m_rgchNextCursor);
-                        Some(x)
-                    }
-                    None => Some(Vec::from(&response.m_rgchNextCursor[..])),
+                    String::from_utf8_nul_truncating(buf)
+                        .expect("Workshop item's preview image URL is not valid UTF-8")
                 };
+                let details = UgcDetails {
+                    published_file_id: PublishedFileId(details.m_nPublishedFileId),
+                    file_type: WorkshopFileType::from_inner(details.m_eFileType),
+                    creator_app_id: AppId(details.m_nCreatorAppID),
+                    title: String::from_utf8_nul_truncating(&details.m_rgchTitle[..])
+                        .expect("Workshop item's title is not valid UTF-8"),
+                    description: String::from_utf8_nul_truncating(&details.m_rgchDescription[..])
+                        .expect("Workshop item's description is not valid UTF-8"),
+                    steam_id_owner: details.m_ulSteamIDOwner.into(),
+                    time_created: Utc.timestamp(i64::from(details.m_rtimeCreated), 0),
+                    time_updated: Utc.timestamp(i64::from(details.m_rtimeUpdated), 0),
+                    time_added_to_user_list: if details.m_rtimeAddedToUserList == 0 {
+                        None
+                    } else {
+                        Some(Utc.timestamp(i64::from(details.m_rtimeAddedToUserList), 0))
+                    },
+                    visibility: PublishedFileVisibility::from_inner(details.m_eVisibility),
+                    banned: details.m_bBanned,
+                    accepted_for_use: details.m_bAcceptedForUse,
+                    tags_truncated: details.m_bTagsTruncated,
+                    tags: Tags(
+                        String::from_utf8_nul_truncating(&details.m_rgchTags[..])
+                            .expect("Workshop item's tags are not valid UTF-8"),
+                    ),
+                    file: UgcHandle::from_inner(details.m_hFile),
+                    preview_file: UgcHandle::from_inner(details.m_hPreviewFile),
+                    preview_url,
+                    file_name: String::from_utf8_nul_truncating(&details.m_pchFileName[..])
+                        .expect("Workshop item's file name is not valid UTF-8"),
+                    file_size: details.m_nFileSize,
+                    preview_file_size: details.m_nPreviewFileSize,
+                    url: String::from_utf8_nul_truncating(&details.m_rgchURL[..])
+                        .expect("Workshop item's url is not valid UTF-8"),
+                    votes_up: details.m_unVotesUp,
+                    votes_down: details.m_unVotesDown,
+                    score: details.m_flScore,
+                    num_children: details.m_unNumChildren,
+                };
+
+                yield details;
+                details_returned += 1;
             }
 
-            Ok(())
+            unsafe { sys::SteamAPI_ISteamUGC_ReleaseQueryUGCRequest(ugc_instance, handle) };
+
+            let more_items_wanted = items_to_reach_quota > 0;
+            let more_items_available = response.m_unTotalMatchingResults > details_returned;
+            if !more_items_wanted || !more_items_available {
+                break;
+            }
+
+            cursor = match cursor {
+                Some(mut x) => {
+                    x.copy_from_slice(&response.m_rgchNextCursor);
+                    Some(x)
+                }
+                None => Some(Vec::from(&response.m_rgchNextCursor[..])),
+            };
         }
     }
 }
