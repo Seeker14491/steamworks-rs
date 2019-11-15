@@ -211,11 +211,13 @@ impl Client {
 
 impl Drop for ClientInner {
     fn drop(&mut self) {
+        self.thread_shutdown.send(()).unwrap();
         unsafe {
-            self.thread_shutdown.send(()).unwrap();
             sys::steam_rust_unregister_callbacks(self.callback_manager);
             sys::SteamAPI_Shutdown();
         }
+
+        STEAM_API_INITIALIZED.store(false, atomic::Ordering::Release);
     }
 }
 
