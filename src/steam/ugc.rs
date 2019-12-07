@@ -368,7 +368,7 @@ impl QueryAllUgc {
     }
 
     /// Executes the query.
-    pub async fn run(self) -> impl Stream<Item = Result<UgcDetails, QueryAllUgcError>> {
+    pub fn run(self) -> impl Stream<Item = Result<UgcDetails, QueryAllUgcError>> {
         Gen::new(|co| {
             async move {
                 let current_app_id = self.client.app_id();
