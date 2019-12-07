@@ -537,7 +537,7 @@ impl QueryAllUgc {
                     let more_items_wanted = items_to_reach_quota > 0;
                     let more_items_available = response.m_unTotalMatchingResults > details_returned;
                     if !more_items_wanted || !more_items_available {
-                        //break;
+                        break;
                     }
 
                     cursor = match cursor {
