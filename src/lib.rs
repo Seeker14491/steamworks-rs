@@ -22,7 +22,6 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-#![feature(generators)]
 #![warn(
     rust_2018_idioms,
     deprecated_in_future,

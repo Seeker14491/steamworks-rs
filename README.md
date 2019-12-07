@@ -6,7 +6,6 @@ Futures-enabled bindings to a tiny portion of the Steamworks API.
 
 ## Requirements
 
-- A recent version of nightly Rust
 - Clang (to run bindgen)
 
 Additionally, to run your binary that depends on this library, you will need to include the necessary `.dll`, `.dylib`, `.so` (depending on the platform) next to the executable. These are found in the `steamworks-sys\steamworks_sdk\redistributable_bin` directory. Note that this isn't necessary if you're running the executable through `cargo run`. Either way, you will probably need a `steam_appid.txt` file, as described in the [official docs](https://partner.steamgames.com/doc/sdk/api#SteamAPI_Init).

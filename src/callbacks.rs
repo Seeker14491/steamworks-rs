@@ -2,11 +2,11 @@ use crate::steam::SteamId;
 use bitflags::bitflags;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use slotmap::HopSlotMap;
+use slotmap::DenseSlotMap;
 use steamworks_sys as sys;
 
 pub(crate) type CallbackStorage<T> =
-    Lazy<Mutex<HopSlotMap<slotmap::DefaultKey, futures::channel::mpsc::UnboundedSender<T>>>>;
+    Lazy<Mutex<DenseSlotMap<slotmap::DefaultKey, futures::channel::mpsc::UnboundedSender<T>>>>;
 
 /// <https://partner.steamgames.com/doc/api/ISteamFriends#PersonaStateChange_t>
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -37,7 +37,7 @@ bitflags! {
 }
 
 pub(crate) static PERSONA_STATE_CHANGED: CallbackStorage<PersonaStateChange> =
-    Lazy::new(|| Mutex::new(HopSlotMap::new()));
+    Lazy::new(|| Mutex::new(DenseSlotMap::new()));
 
 pub(crate) unsafe extern "C" fn on_persona_state_changed(params: *mut sys::PersonaStateChange_t) {
     let params = *params;
@@ -49,7 +49,8 @@ pub(crate) unsafe extern "C" fn on_persona_state_changed(params: *mut sys::Perso
     forward_callback(&PERSONA_STATE_CHANGED, params);
 }
 
-pub(crate) static STEAM_SHUTDOWN: CallbackStorage<()> = Lazy::new(|| Mutex::new(HopSlotMap::new()));
+pub(crate) static STEAM_SHUTDOWN: CallbackStorage<()> =
+    Lazy::new(|| Mutex::new(DenseSlotMap::new()));
 
 pub(crate) unsafe extern "C" fn on_steam_shutdown(_: *mut sys::SteamShutdown_t) {
     forward_callback(&STEAM_SHUTDOWN, ());
