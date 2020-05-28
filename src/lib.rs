@@ -28,9 +28,7 @@
     macro_use_extern_crate,
     missing_debug_implementations,
     single_use_lifetimes,
-    unused_labels,
-    unused_qualifications,
-    clippy::cast_possible_truncation
+    unused_qualifications
 )]
 #![allow(dead_code)]
 

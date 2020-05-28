@@ -1,13 +1,15 @@
-use std::fs;
-use std::path::PathBuf;
-use std::env;
+use std::{env, fs, path::PathBuf};
 
 fn main() {
     let sdk_loc = dunce::canonicalize("steamworks_sdk").expect("steamworks_sdk folder is missing");
 
     let bindings = bindgen::Builder::default()
         .header("wrapper.hpp")
-        .clang_args(&["-std=c++11", "-I", sdk_loc.join("public/steam").to_str().unwrap()])
+        .clang_args(&[
+            "-std=c++11",
+            "-I",
+            sdk_loc.join("public/steam").to_str().unwrap(),
+        ])
         .generate()
         .expect("Unable to generate bindings");
 
@@ -27,12 +29,21 @@ fn main() {
         }
     } else if triple.contains("linux") {
         if triple.contains("i686") {
-            (sdk_loc.join("redistributable_bin/linux32"), "libsteam_api.so")
+            (
+                sdk_loc.join("redistributable_bin/linux32"),
+                "libsteam_api.so",
+            )
         } else {
-            (sdk_loc.join("redistributable_bin/linux64"), "libsteam_api.so")
+            (
+                sdk_loc.join("redistributable_bin/linux64"),
+                "libsteam_api.so",
+            )
         }
     } else if triple.contains("darwin") {
-        (sdk_loc.join("redistributable_bin/osx32"), "libsteam_api.dylib")
+        (
+            sdk_loc.join("redistributable_bin/osx32"),
+            "libsteam_api.dylib",
+        )
     } else {
         panic!("Unsupported OS");
     };
@@ -47,5 +58,9 @@ fn main() {
         .file("src/lib.cpp")
         .compile("steamrust");
 
-    fs::copy(path.join(runtime_dependency), out_path.join(runtime_dependency)).unwrap();
+    fs::copy(
+        path.join(runtime_dependency),
+        out_path.join(runtime_dependency),
+    )
+    .unwrap();
 }
