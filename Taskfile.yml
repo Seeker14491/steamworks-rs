@@ -1,0 +1,39 @@
+version: '2'
+
+vars:
+  PUBLISH: 0
+  PUSH_DOCS_TO_GITHUB_PAGES: 1
+
+tasks:
+  release:
+    preconditions:
+      - sh: '[[ "{{.VERSION}}" != "<no value>" ]]'
+        msg: VERSION not given
+      - sh: '[[ "{{.VERSION}}" =~ ^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$ ]]'
+        msg: VERSION is not a valid SemVer string
+
+    cmds:
+      - cargo test --all-features
+      - cargo fmt -- --check
+      - git diff HEAD --exit-code --name-only
+      - '[[ "{{.PUBLISH}}" = 0 ]] || cargo publish --dry-run'
+      - git tag -a 'v{{.VERSION}}' -m "Release v{{.VERSION}}"
+      - git push origin master
+      - git push origin 'v{{.VERSION}}'
+      - '[[ "{{.PUBLISH}}" = 0 ]] || cargo publish'
+      - task: ghpages
+
+  ghpages:
+    vars:
+      ORIGIN_URL:
+        sh: git remote get-url origin
+    
+    cmds:
+      - |
+        if [[ "{{.PUSH_DOCS_TO_GITHUB_PAGES}}" = 1 ]]; then
+          cd target/doc || exit
+          git init
+          git add .
+          git commit -am "(doc upload)"
+          git push -f "{{.ORIGIN_URL}}" master:gh-pages
+        fi
