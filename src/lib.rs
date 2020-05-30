@@ -119,12 +119,12 @@ impl Client {
             Ok(Client(Arc::new(ClientInner {
                 thread_shutdown: shutdown_tx,
                 callback_manager,
-                friends: sys::steam_rust_get_friends(),
-                remote_storage: sys::steam_rust_get_remote_storage(),
-                ugc: sys::steam_rust_get_ugc(),
-                user: sys::steam_rust_get_user(),
-                user_stats: sys::steam_rust_get_user_stats(),
-                utils: sys::steam_rust_get_utils(),
+                friends: sys::SteamAPI_SteamFriends_v017(),
+                remote_storage: sys::SteamAPI_SteamRemoteStorage_v014(),
+                ugc: sys::SteamAPI_SteamUGC_v014(),
+                user: sys::SteamAPI_SteamUser_v020(),
+                user_stats: sys::SteamAPI_SteamUserStats_v011(),
+                utils: sys::SteamAPI_SteamUtils_v009(),
             })))
         }
     }
@@ -148,12 +148,12 @@ impl Client {
 
     /// <https://partner.steamgames.com/doc/api/ISteamUtils#GetAppID>
     pub fn app_id(&self) -> AppId {
-        unsafe { sys::SteamAPI_ISteamUtils_GetAppID(self.0.utils as isize).into() }
+        unsafe { sys::SteamAPI_ISteamUtils_GetAppID(self.0.utils).into() }
     }
 
     /// <https://partner.steamgames.com/doc/api/ISteamUser#GetSteamID>
     pub fn steam_id(&self) -> SteamId {
-        let id = unsafe { sys::SteamAPI_ISteamUser_GetSteamID(self.0.user as isize) };
+        let id = unsafe { sys::SteamAPI_ISteamUser_GetSteamID(self.0.user) };
 
         id.into()
     }
@@ -181,7 +181,7 @@ impl Client {
                 task::sleep(Duration::from_millis(5)).await;
                 let completed = unsafe {
                     sys::SteamAPI_ISteamUtils_GetAPICallResult(
-                        self.0.utils as isize,
+                        self.0.utils,
                         api_call,
                         callback_data.as_mut_ptr() as *mut c_void,
                         mem::size_of::<CallResult>().try_into().unwrap(),

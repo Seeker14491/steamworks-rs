@@ -1,12 +1,5 @@
 #include "../wrapper.hpp"
 
-ISteamFriends* steam_rust_get_friends() { return SteamFriends(); }
-ISteamRemoteStorage* steam_rust_get_remote_storage() { return SteamRemoteStorage(); }
-ISteamUGC* steam_rust_get_ugc() { return SteamUGC(); }
-ISteamUser* steam_rust_get_user() { return SteamUser(); }
-ISteamUserStats* steam_rust_get_user_stats() { return SteamUserStats(); }
-ISteamUtils* steam_rust_get_utils() { return SteamUtils(); }
-
 CallbackManager::CallbackManager(SteamRustCallbacks callbacks): callbacks(callbacks) {
     this->persona_state_change_registration.Register(this, &CallbackManager::OnPersonaStateChange);
     this->steam_shutdown_registration.Register(this, &CallbackManager::OnSteamShutdown);

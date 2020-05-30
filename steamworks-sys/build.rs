@@ -8,7 +8,8 @@ fn main() {
         .clang_args(&[
             "-std=c++11",
             "-I",
-            sdk_loc.join("public/steam").to_str().unwrap(),
+            sdk_loc.join("public").to_str().unwrap(),
+            "-Wno-deprecated-declarations",
         ])
         .generate()
         .expect("Unable to generate bindings");
@@ -54,7 +55,7 @@ fn main() {
     cc::Build::new()
         .cpp(true)
         .flag_if_supported("-std=c++11")
-        .include(sdk_loc.join("public/steam"))
+        .include(sdk_loc.join("public"))
         .file("src/lib.cpp")
         .compile("steamrust");
 

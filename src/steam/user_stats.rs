@@ -132,7 +132,7 @@ impl LeaderboardHandle {
             .client
             .future_from_call_result_fn(sys::LeaderboardScoreUploaded_t_k_iCallback, || unsafe {
                 sys::SteamAPI_ISteamUserStats_UploadLeaderboardScore(
-                    self.client.0.user_stats as isize,
+                    self.client.0.user_stats,
                     self.handle,
                     leaderboard_upload_score_method,
                     score,
@@ -166,7 +166,7 @@ impl LeaderboardHandle {
             .client
             .future_from_call_result_fn(sys::LeaderboardScoresDownloaded_t_k_iCallback, || unsafe {
                 sys::SteamAPI_ISteamUserStats_DownloadLeaderboardEntries(
-                    self.client.0.user_stats as isize,
+                    self.client.0.user_stats,
                     self.handle,
                     request_type,
                     range_start,
@@ -182,7 +182,7 @@ impl LeaderboardHandle {
             let mut details = vec![0; max_details as usize];
             let success = unsafe {
                 sys::SteamAPI_ISteamUserStats_GetDownloadedLeaderboardEntry(
-                    self.client.0.user_stats as isize,
+                    self.client.0.user_stats,
                     response.m_hSteamLeaderboardEntries,
                     i,
                     raw_entry.as_mut_ptr(),
@@ -196,7 +196,7 @@ impl LeaderboardHandle {
 
             details.truncate(raw_entry.m_cDetails as usize);
             entries.push(LeaderboardEntry {
-                steam_id: SteamId(raw_entry.m_steamIDUser),
+                steam_id: raw_entry.m_steamIDUser.into(),
                 global_rank: raw_entry.m_nGlobalRank,
                 score: raw_entry.m_nScore,
                 details,
@@ -281,7 +281,7 @@ pub(crate) async fn find_leaderboard(
     let response: sys::LeaderboardFindResult_t = client
         .future_from_call_result_fn(sys::LeaderboardFindResult_t_k_iCallback, || unsafe {
             sys::SteamAPI_ISteamUserStats_FindLeaderboard(
-                client.0.user_stats as isize,
+                client.0.user_stats,
                 leaderboard_name_bytes.as_ptr() as *const i8,
             )
         })

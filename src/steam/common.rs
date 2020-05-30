@@ -9,6 +9,7 @@ use std::{
     hash::{Hash, Hasher},
 };
 use steamworks_sys as sys;
+use steamworks_sys::CSteamID;
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct AppId(pub u32);
@@ -32,7 +33,7 @@ impl From<AppId> for u32 {
 }
 
 #[derive(Copy, Clone)]
-pub struct SteamId(pub(crate) sys::CSteamID);
+pub struct SteamId(pub(crate) u64);
 
 impl SteamId {
     pub fn new(id: u64) -> Self {
@@ -41,7 +42,7 @@ impl SteamId {
 
     pub async fn persona_name(self, client: &Client) -> String {
         unsafe {
-            let instance = client.0.friends as isize;
+            let instance = client.0.friends;
 
             let request_in_progress =
                 sys::SteamAPI_ISteamFriends_RequestUserInformation(instance, self.0, true);
@@ -74,23 +75,25 @@ impl SteamId {
     }
 
     pub fn as_u64(self) -> u64 {
-        self.into()
+        self.0
     }
 }
 
 impl From<u64> for SteamId {
     fn from(inner: u64) -> Self {
-        SteamId(sys::CSteamID {
-            m_steamid: sys::CSteamID_SteamID_t {
-                m_unAll64Bits: inner,
-            },
-        })
+        SteamId(inner)
     }
 }
 
 impl From<SteamId> for u64 {
     fn from(steam_id: SteamId) -> Self {
-        unsafe { steam_id.0.m_steamid.m_unAll64Bits }
+        steam_id.0
+    }
+}
+
+impl From<CSteamID> for SteamId {
+    fn from(id: CSteamID) -> Self {
+        unsafe { SteamId(id.m_steamid.m_unAll64Bits) }
     }
 }
 

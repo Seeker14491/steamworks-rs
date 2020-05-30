@@ -1,12 +1,25 @@
-#include "steam_api.h"
-#include "steam_api_flat.h"
+#include <stdint.h>
 
-ISteamFriends* steam_rust_get_friends();
-ISteamRemoteStorage* steam_rust_get_remote_storage();
-ISteamUGC* steam_rust_get_ugc();
-ISteamUser* steam_rust_get_user();
-ISteamUserStats* steam_rust_get_user_stats();
-ISteamUtils* steam_rust_get_utils();
+/*
+    These two type definitions are missing from the Steamworks SDK for some reason, which causes errors, so we define
+    them here.
+*/
+
+struct SteamTVRegion_t {
+    uint32_t unMinX;
+    uint32_t unMinY;
+    uint32_t unMaxX;
+    uint32_t unMaxY;
+};
+
+enum ESteamTVRegionBehavior {
+    k_ESteamVideoRegionBehaviorInvalid = -1,
+    k_ESteamVideoRegionBehaviorHover = 0,
+    k_ESteamVideoRegionBehaviorClickPopup = 1,
+    k_ESteamVideoRegionBehaviorClickSurroundingRegion = 2,
+};
+
+#include "steam/steam_api_flat.h"
 
 typedef struct {
     void (*onPersonaStateChanged)(PersonaStateChange_t*);

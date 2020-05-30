@@ -23,7 +23,7 @@ impl UgcHandle {
                     sys::RemoteStorageDownloadUGCResult_t_k_iCallback,
                     || {
                         sys::SteamAPI_ISteamRemoteStorage_UGCDownloadToLocation(
-                            client.0.remote_storage as isize,
+                            client.0.remote_storage,
                             self.0,
                             location.as_ptr(),
                             priority,

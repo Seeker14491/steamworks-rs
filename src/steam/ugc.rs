@@ -379,7 +379,7 @@ impl QueryAllUgc {
 
             let max_results = self.max_results.unwrap_or(u32::max_value());
 
-            let ugc_instance = self.client.0.ugc as isize;
+            let ugc_instance = self.client.0.ugc;
             let mut cursor: Option<Vec<c_char>> = None;
             let mut details_returned = 0;
             loop {
@@ -388,7 +388,7 @@ impl QueryAllUgc {
                         Some(x) => x.as_ptr(),
                         None => ptr::null(),
                     };
-                    sys::SteamAPI_ISteamUGC_CreateQueryAllUGCRequest0(
+                    sys::SteamAPI_ISteamUGC_CreateQueryAllUGCRequestCursor(
                         ugc_instance,
                         self.query_type.into(),
                         self.matching_ugc_type.into(),
