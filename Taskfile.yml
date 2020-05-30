@@ -32,6 +32,7 @@ tasks:
       - |
         if [[ "{{.PUSH_DOCS_TO_GITHUB_PAGES}}" = 1 ]]; then
           cd target/doc || exit
+          rm -rf .git
           git init
           git add .
           git commit -am "(doc upload)"
