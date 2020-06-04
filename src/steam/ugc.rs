@@ -368,7 +368,7 @@ impl QueryAllUgc {
     }
 
     /// Executes the query.
-    pub fn run(self) -> impl Stream<Item = Result<UgcDetails, QueryAllUgcError>> {
+    pub fn run(self) -> impl Stream<Item = Result<UgcDetails, QueryAllUgcError>> + Send {
         Gen::new(|co| async move {
             let current_app_id = self.client.app_id();
             if let (Some(x), Some(y)) = (self.creator_app_id, self.consumer_app_id) {
@@ -379,7 +379,7 @@ impl QueryAllUgc {
 
             let max_results = self.max_results.unwrap_or(u32::max_value());
 
-            let ugc_instance = self.client.0.ugc;
+            let client = self.client.clone();
             let mut cursor: Option<Vec<c_char>> = None;
             let mut details_returned = 0;
             loop {
@@ -389,7 +389,7 @@ impl QueryAllUgc {
                         None => ptr::null(),
                     };
                     sys::SteamAPI_ISteamUGC_CreateQueryAllUGCRequestCursor(
-                        ugc_instance,
+                        client.0.ugc,
                         self.query_type.into(),
                         self.matching_ugc_type.into(),
                         self.creator_app_id.unwrap_or_else(|| current_app_id).into(),
@@ -406,14 +406,14 @@ impl QueryAllUgc {
 
                 unsafe {
                     let success = sys::SteamAPI_ISteamUGC_SetReturnLongDescription(
-                        ugc_instance,
+                        client.0.ugc,
                         handle,
                         self.return_long_description,
                     );
                     assert!(success, "SetReturnLongDescription failed");
 
                     let success = sys::SteamAPI_ISteamUGC_SetMatchAnyTag(
-                        ugc_instance,
+                        client.0.ugc,
                         handle,
                         self.match_any_tag,
                     );
@@ -422,13 +422,13 @@ impl QueryAllUgc {
                     for (tag, required) in &self.tags {
                         if *required {
                             sys::SteamAPI_ISteamUGC_AddRequiredTag(
-                                ugc_instance,
+                                client.0.ugc,
                                 handle,
                                 tag.as_ptr(),
                             );
                         } else {
                             sys::SteamAPI_ISteamUGC_AddExcludedTag(
-                                ugc_instance,
+                                client.0.ugc,
                                 handle,
                                 tag.as_ptr(),
                             );
@@ -441,7 +441,7 @@ impl QueryAllUgc {
                     .future_from_call_result_fn(
                         sys::SteamUGCQueryCompleted_t_k_iCallback,
                         || unsafe {
-                            sys::SteamAPI_ISteamUGC_SendQueryUGCRequest(ugc_instance, handle)
+                            sys::SteamAPI_ISteamUGC_SendQueryUGCRequest(client.0.ugc, handle)
                         },
                     )
                     .await;
@@ -465,7 +465,7 @@ impl QueryAllUgc {
                     let mut details: MaybeUninit<sys::SteamUGCDetails_t> = MaybeUninit::uninit();
                     let success = unsafe {
                         sys::SteamAPI_ISteamUGC_GetQueryUGCResult(
-                            ugc_instance,
+                            client.0.ugc,
                             response.m_handle,
                             i,
                             details.as_mut_ptr(),
@@ -476,7 +476,7 @@ impl QueryAllUgc {
                     let preview_url = unsafe {
                         let mut buf = vec![0_u8; 256];
                         sys::SteamAPI_ISteamUGC_GetQueryUGCPreviewURL(
-                            ugc_instance,
+                            client.0.ugc,
                             response.m_handle,
                             i,
                             buf.as_mut_ptr() as *mut c_char,
@@ -530,7 +530,7 @@ impl QueryAllUgc {
                     details_returned += 1;
                 }
 
-                unsafe { sys::SteamAPI_ISteamUGC_ReleaseQueryUGCRequest(ugc_instance, handle) };
+                unsafe { sys::SteamAPI_ISteamUGC_ReleaseQueryUGCRequest(client.0.ugc, handle) };
 
                 let more_items_wanted = items_to_reach_quota > 0;
                 let more_items_available = response.m_unTotalMatchingResults > details_returned;

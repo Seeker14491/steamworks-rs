@@ -37,6 +37,9 @@ pub mod callbacks;
 mod steam;
 mod string_ext;
 
+#[cfg(test)]
+mod testing;
+
 pub use steam::*;
 
 use crate::callbacks::CallbackStorage;
@@ -159,12 +162,14 @@ impl Client {
     }
 
     /// <https://partner.steamgames.com/doc/api/ISteamFriends#PersonaStateChange_t>
-    pub fn on_persona_state_changed(&self) -> impl Stream<Item = callbacks::PersonaStateChange> {
+    pub fn on_persona_state_changed(
+        &self,
+    ) -> impl Stream<Item = callbacks::PersonaStateChange> + Send {
         self.get_callback_stream(&callbacks::PERSONA_STATE_CHANGED)
     }
 
     /// <https://partner.steamgames.com/doc/api/ISteamUtils#SteamShutdown_t>
-    pub fn on_steam_shutdown(&self) -> impl Stream<Item = ()> {
+    pub fn on_steam_shutdown(&self) -> impl Stream<Item = ()> + Send {
         self.get_callback_stream(&callbacks::STEAM_SHUTDOWN)
     }
 
@@ -199,7 +204,10 @@ impl Client {
         unsafe { callback_data.assume_init() }
     }
 
-    fn get_callback_stream<T: Send>(&self, storage: &CallbackStorage<T>) -> impl Stream<Item = T> {
+    fn get_callback_stream<T: Send>(
+        &self,
+        storage: &CallbackStorage<T>,
+    ) -> impl Stream<Item = T> + Send {
         let (tx, rx) = futures::channel::mpsc::unbounded();
         storage.lock().insert(tx);
         rx
@@ -243,4 +251,17 @@ pub enum InitError {
     /// The Steamworks API failed to initialize (SteamAPI_Init() returned false)
     #[snafu(display("The Steamworks API failed to initialize (SteamAPI_Init() returned false)"))]
     Other,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testing::assert_value_send;
+
+    #[test]
+    #[ignore]
+    #[allow(unreachable_code)]
+    fn find_leaderboard_send() {
+        assert_value_send(Client::find_leaderboard(panic!(), []));
+    }
 }

@@ -297,3 +297,47 @@ pub(crate) async fn find_leaderboard(
         handle: response.m_hSteamLeaderboard,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testing::assert_value_send;
+
+    #[test]
+    #[ignore]
+    #[allow(unreachable_code)]
+    fn download_global_send() {
+        assert_value_send(LeaderboardHandle::download_global(panic!(), 0, 0, 0));
+    }
+
+    #[test]
+    #[ignore]
+    #[allow(unreachable_code)]
+    fn download_global_around_user_send() {
+        assert_value_send(LeaderboardHandle::download_global_around_user(
+            panic!(),
+            0,
+            0,
+            0,
+        ));
+    }
+
+    #[test]
+    #[ignore]
+    #[allow(unreachable_code)]
+    fn download_friends_send() {
+        assert_value_send(LeaderboardHandle::download_friends(panic!(), 0));
+    }
+
+    #[test]
+    #[ignore]
+    #[allow(unreachable_code)]
+    fn upload_leaderboard_score_send() {
+        assert_value_send(LeaderboardHandle::upload_leaderboard_score(
+            panic!(),
+            0,
+            None,
+            false,
+        ));
+    }
+}

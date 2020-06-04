@@ -42,16 +42,17 @@ impl SteamId {
 
     pub async fn persona_name(self, client: &Client) -> String {
         unsafe {
-            let instance = client.0.friends;
-
             let request_in_progress =
-                sys::SteamAPI_ISteamFriends_RequestUserInformation(instance, self.0, true);
+                sys::SteamAPI_ISteamFriends_RequestUserInformation(client.0.friends, self.0, true);
             if request_in_progress {
                 let mut stream = client.on_persona_state_changed();
 
                 // Check again to make sure the callback wasn't sent before we registered for it
-                let request_in_progress =
-                    sys::SteamAPI_ISteamFriends_RequestUserInformation(instance, self.0, true);
+                let request_in_progress = sys::SteamAPI_ISteamFriends_RequestUserInformation(
+                    client.0.friends,
+                    self.0,
+                    true,
+                );
 
                 if request_in_progress {
                     loop {
@@ -65,7 +66,7 @@ impl SteamId {
                 }
             }
 
-            let name = sys::SteamAPI_ISteamFriends_GetFriendPersonaName(instance, self.0);
+            let name = sys::SteamAPI_ISteamFriends_GetFriendPersonaName(client.0.friends, self.0);
 
             CStr::from_ptr(name)
                 .to_owned()
@@ -375,5 +376,18 @@ impl Display for SteamResult {
         };
 
         write!(f, "{}", error_string)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testing::assert_value_send;
+
+    #[test]
+    #[ignore]
+    #[allow(unreachable_code)]
+    fn persona_name_send() {
+        assert_value_send(SteamId::persona_name(panic!(), panic!()));
     }
 }
