@@ -1,7 +1,5 @@
 # Release Procedure
 
-Dependency: The "[Task](https://taskfile.dev/)" task runner
-
 1. Update version number in Cargo.toml
 4. Commit changes
-5. Run `task release VERSION=a.b.c`, substituting the correct version
+5. Using [Deno](https://deno.land/), run `deno run -A Drakefile.ts release version=a.b.c`, substituting the correct version
