@@ -21,21 +21,18 @@ task("release", [], async () => {
     abort("The given version is not a valid SemVer string");
   }
 
-  await sh([
-    "cargo test --all-features",
-    "cargo fmt -- --check",
-    "git diff HEAD --exit-code --name-only",
-  ]);
+  await sh("cargo test --all-features");
+  await sh("cargo fmt -- --check");
+  await sh("git diff HEAD --exit-code --name-only");
 
   if (SHOULD_CARGO_PUBLISH) {
     await sh("cargo publish --dry-run");
   }
 
-  await sh([
-    `git tag -a 'v${version}' -m 'Release v${version}'`,
-    "git push origin master",
-    `git push origin 'v${version}'`,
-  ]);
+  const tagName = `v${version}`;
+  await sh(`git tag -a ${tagName} -m "Release ${tagName}"`);
+  await sh("git push origin master");
+  await sh(`git push origin ${tagName}`);
 
   if (SHOULD_CARGO_PUBLISH) {
     await sh("cargo publish");
@@ -54,20 +51,23 @@ task("upload-docs", [], async () => {
       "git remote get-url origin",
     );
     if (code == 0) {
-      origin_url = output;
+      origin_url = output.trim();
     } else {
       abort("Error getting origin's url from git");
     }
   }
 
-  await Deno.remove("target/doc/.git", { recursive: true });
+  await sh("cargo clean --doc");
+  await sh("cargo doc --no-deps");
 
-  await sh([
-    "git init",
-    "git add .",
-    "git commit -am '(doc upload)'",
-    `git push -f ${origin_url} master:gh-pages`,
-  ], { cwd: "target/doc" });
+  {
+    const run = (command: string) => sh(command, { cwd: "target/doc" });
+
+    await run("git init");
+    await run("git add .");
+    await run('git commit -am "(doc upload)"');
+    await run(`git push -f ${origin_url} master:gh-pages`);
+  }
 });
 
 run();
