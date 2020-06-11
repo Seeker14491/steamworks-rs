@@ -175,7 +175,7 @@ impl Client {
 
     async fn future_from_call_result_fn<CallResult>(
         &self,
-        magic_number: impl CallResultMagicNumber,
+        magic_number: i32,
         make_call: impl Fn() -> sys::SteamAPICall_t,
     ) -> CallResult {
         let mut callback_data: MaybeUninit<CallResult> = MaybeUninit::zeroed();
@@ -190,7 +190,7 @@ impl Client {
                         api_call,
                         callback_data.as_mut_ptr() as *mut c_void,
                         mem::size_of::<CallResult>().try_into().unwrap(),
-                        magic_number.as_i32(),
+                        magic_number,
                         &mut failed,
                     )
                 };
@@ -223,22 +223,6 @@ impl Drop for ClientInner {
         }
 
         STEAM_API_INITIALIZED.store(false, atomic::Ordering::Release);
-    }
-}
-
-trait CallResultMagicNumber: Copy {
-    fn as_i32(self) -> i32;
-}
-
-impl CallResultMagicNumber for i32 {
-    fn as_i32(self) -> i32 {
-        self
-    }
-}
-
-impl CallResultMagicNumber for u32 {
-    fn as_i32(self) -> i32 {
-        self as i32
     }
 }
 
