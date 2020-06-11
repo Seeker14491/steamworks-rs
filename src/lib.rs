@@ -43,9 +43,8 @@ mod testing;
 pub use steam::*;
 
 use crate::callbacks::CallbackStorage;
-use async_std::task;
-use crossbeam_channel::Sender;
 use futures::Stream;
+use smol::Timer;
 use snafu::{ensure, Snafu};
 use std::{
     convert::TryInto,
@@ -53,6 +52,7 @@ use std::{
     mem::{self, MaybeUninit},
     sync::{
         atomic::{self, AtomicBool},
+        mpsc::{self, SyncSender},
         Arc,
     },
     thread,
@@ -70,7 +70,7 @@ pub struct Client(Arc<ClientInner>);
 
 #[derive(Debug)]
 struct ClientInner {
-    thread_shutdown: Sender<()>,
+    thread_shutdown: SyncSender<()>,
     callback_manager: *mut sys::CallbackManager,
     friends: *mut sys::ISteamFriends,
     remote_storage: *mut sys::ISteamRemoteStorage,
@@ -107,15 +107,19 @@ impl Client {
             })
         };
 
-        let (shutdown_tx, shutdown_rx) = crossbeam_channel::bounded(0);
-        thread::spawn(move || loop {
-            unsafe { sys::SteamAPI_RunCallbacks() }
+        let (shutdown_tx, shutdown_rx) = mpsc::sync_channel(0);
+        thread::spawn(move || {
+            smol::run(async {
+                loop {
+                    unsafe { sys::SteamAPI_RunCallbacks() }
 
-            if let Ok(()) = shutdown_rx.try_recv() {
-                break;
-            }
+                    if let Ok(()) = shutdown_rx.try_recv() {
+                        break;
+                    }
 
-            thread::sleep(Duration::from_millis(1));
+                    Timer::after(Duration::from_millis(1)).await;
+                }
+            });
         });
 
         unsafe {
@@ -183,7 +187,7 @@ impl Client {
         while failed {
             let api_call = make_call();
             loop {
-                task::sleep(Duration::from_millis(5)).await;
+                Timer::after(Duration::from_millis(5)).await;
                 let completed = unsafe {
                     sys::SteamAPI_ISteamUtils_GetAPICallResult(
                         self.0.utils,
