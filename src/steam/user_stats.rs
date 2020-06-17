@@ -5,7 +5,7 @@ use crate::{
     steam::{remote_storage::UgcHandle, SteamId},
     Client,
 };
-use futures::lock::Mutex;
+use futures::{lock::Mutex, Future};
 use once_cell::sync::Lazy;
 use snafu::{ensure, ResultExt};
 use std::{cmp, convert::TryInto, ffi::CString, mem::MaybeUninit, ptr};
@@ -33,12 +33,12 @@ impl LeaderboardHandle {
     /// # Panics
     ///
     /// Panics if `range_start < 1` or `range_end < range_start`.
-    pub async fn download_global(
+    pub fn download_global(
         &self,
         range_start: u32,
         range_end: u32,
         max_details: u8,
-    ) -> Vec<LeaderboardEntry> {
+    ) -> impl Future<Output = Vec<LeaderboardEntry>> + Send + Sync + '_ {
         assert!(range_start > 0);
         assert!(range_end >= range_start);
 
@@ -48,7 +48,6 @@ impl LeaderboardHandle {
             range_end.try_into().unwrap_or(i32::max_value()),
             max_details,
         )
-        .await
     }
 
     /// Fetches a sequential range of leaderboard entries by position relative to the current user's
@@ -60,12 +59,12 @@ impl LeaderboardHandle {
     /// # Panics
     ///
     /// Panics if `range_end < range_start`.
-    pub async fn download_global_around_user(
+    pub fn download_global_around_user(
         &self,
         range_start: i32,
         range_end: i32,
         max_details: u8,
-    ) -> Vec<LeaderboardEntry> {
+    ) -> impl Future<Output = Vec<LeaderboardEntry>> + Send + Sync + '_ {
         assert!(range_end >= range_start);
 
         self.download_entry_range(
@@ -74,20 +73,21 @@ impl LeaderboardHandle {
             range_end,
             max_details,
         )
-        .await
     }
 
     /// Fetches all leaderboard entries for friends of the current user.
     ///
     /// `max_details` should be 64 or less; higher values will be clamped.
-    pub async fn download_friends(&self, max_details: u8) -> Vec<LeaderboardEntry> {
+    pub fn download_friends(
+        &self,
+        max_details: u8,
+    ) -> impl Future<Output = Vec<LeaderboardEntry>> + Send + Sync + '_ {
         self.download_entry_range(
             sys::ELeaderboardDataRequest_k_ELeaderboardDataRequestFriends,
             0,
             0,
             max_details,
         )
-        .await
     }
 
     /// Uploads a score to the leaderboard.
@@ -100,12 +100,15 @@ impl LeaderboardHandle {
     /// # Panics
     ///
     /// Panics if `details`, if provided, has a length greater than `64`.
-    pub async fn upload_leaderboard_score(
-        &self,
+    pub fn upload_leaderboard_score<'out, 'a: 'out, 'b: 'out>(
+        &'a self,
         score: i32,
-        details: Option<&[i32]>,
+        details: Option<&'b [i32]>,
         force_update: bool,
-    ) -> Result<LeaderboardScoreUploaded, UploadLeaderboardScoreError> {
+    ) -> impl Future<Output = Result<LeaderboardScoreUploaded, UploadLeaderboardScoreError>>
+           + Send
+           + Sync
+           + 'out {
         // Steamworks API: "you may only have one outstanding call to this function at a time"
         static LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
@@ -126,85 +129,94 @@ impl LeaderboardHandle {
             None => 0,
         };
 
-        let _guard = LOCK.lock().await;
+        async move {
+            let _guard = LOCK.lock().await;
 
-        let response: sys::LeaderboardScoreUploaded_t = self
-            .client
-            .future_from_call_result_fn(sys::LeaderboardScoreUploaded_t_k_iCallback, || unsafe {
-                sys::SteamAPI_ISteamUserStats_UploadLeaderboardScore(
-                    self.client.0.user_stats,
-                    self.handle,
-                    leaderboard_upload_score_method,
-                    score,
-                    details.map(|xs| xs.as_ptr()).unwrap_or(ptr::null()),
-                    details_count,
+            let response: sys::LeaderboardScoreUploaded_t = self
+                .client
+                .future_from_call_result_fn(
+                    sys::LeaderboardScoreUploaded_t_k_iCallback,
+                    || unsafe {
+                        sys::SteamAPI_ISteamUserStats_UploadLeaderboardScore(
+                            self.client.0.user_stats,
+                            self.handle,
+                            leaderboard_upload_score_method,
+                            score,
+                            details.map(|xs| xs.as_ptr()).unwrap_or(ptr::null()),
+                            details_count,
+                        )
+                    },
                 )
-            })
-            .await;
+                .await;
 
-        if response.m_bSuccess == 1 {
-            Ok(LeaderboardScoreUploaded {
-                score_changed: response.m_bScoreChanged != 0,
-                global_rank_new: response.m_nGlobalRankNew,
-                global_rank_previous: response.m_nGlobalRankPrevious,
-            })
-        } else {
-            Err(UploadLeaderboardScoreError)
+            if response.m_bSuccess == 1 {
+                Ok(LeaderboardScoreUploaded {
+                    score_changed: response.m_bScoreChanged != 0,
+                    global_rank_new: response.m_nGlobalRankNew,
+                    global_rank_previous: response.m_nGlobalRankPrevious,
+                })
+            } else {
+                Err(UploadLeaderboardScoreError)
+            }
         }
     }
 
-    async fn download_entry_range(
+    fn download_entry_range(
         &self,
         request_type: sys::ELeaderboardDataRequest,
         range_start: i32,
         range_end: i32,
         max_details: u8,
-    ) -> Vec<LeaderboardEntry> {
+    ) -> impl Future<Output = Vec<LeaderboardEntry>> + Send + Sync + '_ {
         let max_details = cmp::min(max_details, 64);
-
-        let response: sys::LeaderboardScoresDownloaded_t = self
-            .client
-            .future_from_call_result_fn(sys::LeaderboardScoresDownloaded_t_k_iCallback, || unsafe {
-                sys::SteamAPI_ISteamUserStats_DownloadLeaderboardEntries(
-                    self.client.0.user_stats,
-                    self.handle,
-                    request_type,
-                    range_start,
-                    range_end,
+        async move {
+            let response: sys::LeaderboardScoresDownloaded_t = self
+                .client
+                .future_from_call_result_fn(
+                    sys::LeaderboardScoresDownloaded_t_k_iCallback,
+                    || unsafe {
+                        sys::SteamAPI_ISteamUserStats_DownloadLeaderboardEntries(
+                            self.client.0.user_stats,
+                            self.handle,
+                            request_type,
+                            range_start,
+                            range_end,
+                        )
+                    },
                 )
-            })
-            .await;
+                .await;
 
-        let mut entries: Vec<LeaderboardEntry> =
-            Vec::with_capacity(response.m_cEntryCount as usize);
-        for i in 0..response.m_cEntryCount {
-            let mut raw_entry: MaybeUninit<sys::LeaderboardEntry_t> = MaybeUninit::uninit();
-            let mut details = vec![0; max_details as usize];
-            let success = unsafe {
-                sys::SteamAPI_ISteamUserStats_GetDownloadedLeaderboardEntry(
-                    self.client.0.user_stats,
-                    response.m_hSteamLeaderboardEntries,
-                    i,
-                    raw_entry.as_mut_ptr(),
-                    details.as_mut_ptr(),
-                    max_details.into(),
-                )
-            };
+            let mut entries: Vec<LeaderboardEntry> =
+                Vec::with_capacity(response.m_cEntryCount as usize);
+            for i in 0..response.m_cEntryCount {
+                let mut raw_entry: MaybeUninit<sys::LeaderboardEntry_t> = MaybeUninit::uninit();
+                let mut details = vec![0; max_details as usize];
+                let success = unsafe {
+                    sys::SteamAPI_ISteamUserStats_GetDownloadedLeaderboardEntry(
+                        self.client.0.user_stats,
+                        response.m_hSteamLeaderboardEntries,
+                        i,
+                        raw_entry.as_mut_ptr(),
+                        details.as_mut_ptr(),
+                        max_details.into(),
+                    )
+                };
 
-            assert!(success, "GetDownloadedLeaderboardEntry failed");
-            let raw_entry = unsafe { raw_entry.assume_init() };
+                assert!(success, "GetDownloadedLeaderboardEntry failed");
+                let raw_entry = unsafe { raw_entry.assume_init() };
 
-            details.truncate(raw_entry.m_cDetails as usize);
-            entries.push(LeaderboardEntry {
-                steam_id: raw_entry.m_steamIDUser.into(),
-                global_rank: raw_entry.m_nGlobalRank,
-                score: raw_entry.m_nScore,
-                details,
-                ugc: UgcHandle::from_inner(raw_entry.m_hUGC),
-            });
+                details.truncate(raw_entry.m_cDetails as usize);
+                entries.push(LeaderboardEntry {
+                    steam_id: raw_entry.m_steamIDUser.into(),
+                    global_rank: raw_entry.m_nGlobalRank,
+                    score: raw_entry.m_nScore,
+                    details,
+                    ugc: UgcHandle::from_inner(raw_entry.m_hUGC),
+                });
+            }
+
+            entries
         }
-
-        entries
     }
 }
 
@@ -265,79 +277,38 @@ mod error {
     impl Error for UploadLeaderboardScoreError {}
 }
 
-pub(crate) async fn find_leaderboard(
+pub(crate) fn find_leaderboard(
     client: &Client,
-    leaderboard_name: impl Into<Vec<u8>>,
-) -> Result<LeaderboardHandle, FindLeaderboardError> {
-    let leaderboard_name = CString::new(leaderboard_name).context(error::Nul)?;
-    let leaderboard_name_bytes = leaderboard_name.as_bytes_with_nul();
-    ensure!(
-        leaderboard_name_bytes.len() - 1 <= sys::k_cchLeaderboardNameMax as usize,
-        error::TooLong {
-            length: leaderboard_name_bytes.len() - 1
-        }
-    );
+    leaderboard_name: Vec<u8>,
+) -> impl Future<Output = Result<LeaderboardHandle, FindLeaderboardError>> + Send + Sync + '_ {
+    let leaderboard_name = CString::new(leaderboard_name);
+    async move {
+        let leaderboard_name = leaderboard_name.context(error::Nul)?;
+        let leaderboard_name_bytes = leaderboard_name.as_bytes_with_nul();
+        ensure!(
+            leaderboard_name_bytes.len() - 1 <= sys::k_cchLeaderboardNameMax as usize,
+            error::TooLong {
+                length: leaderboard_name_bytes.len() - 1
+            }
+        );
 
-    let response: sys::LeaderboardFindResult_t = client
-        .future_from_call_result_fn(sys::LeaderboardFindResult_t_k_iCallback, || unsafe {
-            sys::SteamAPI_ISteamUserStats_FindLeaderboard(
-                client.0.user_stats,
-                leaderboard_name_bytes.as_ptr() as *const i8,
-            )
+        let response: sys::LeaderboardFindResult_t = client
+            .future_from_call_result_fn(sys::LeaderboardFindResult_t_k_iCallback, || unsafe {
+                sys::SteamAPI_ISteamUserStats_FindLeaderboard(
+                    client.0.user_stats,
+                    leaderboard_name_bytes.as_ptr() as *const i8,
+                )
+            })
+            .await;
+
+        ensure!(
+            response.m_bLeaderboardFound != 0,
+            error::NotFound { leaderboard_name }
+        );
+
+        Ok(LeaderboardHandle {
+            client: client.clone(),
+            handle: response.m_hSteamLeaderboard,
         })
-        .await;
-
-    ensure!(
-        response.m_bLeaderboardFound != 0,
-        error::NotFound { leaderboard_name }
-    );
-
-    Ok(LeaderboardHandle {
-        client: client.clone(),
-        handle: response.m_hSteamLeaderboard,
-    })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::testing::assert_value_send;
-
-    #[test]
-    #[ignore]
-    #[allow(unreachable_code)]
-    fn download_global_send() {
-        assert_value_send(LeaderboardHandle::download_global(panic!(), 0, 0, 0));
-    }
-
-    #[test]
-    #[ignore]
-    #[allow(unreachable_code)]
-    fn download_global_around_user_send() {
-        assert_value_send(LeaderboardHandle::download_global_around_user(
-            panic!(),
-            0,
-            0,
-            0,
-        ));
-    }
-
-    #[test]
-    #[ignore]
-    #[allow(unreachable_code)]
-    fn download_friends_send() {
-        assert_value_send(LeaderboardHandle::download_friends(panic!(), 0));
-    }
-
-    #[test]
-    #[ignore]
-    #[allow(unreachable_code)]
-    fn upload_leaderboard_score_send() {
-        assert_value_send(LeaderboardHandle::upload_leaderboard_score(
-            panic!(),
-            0,
-            None,
-            false,
-        ));
     }
 }

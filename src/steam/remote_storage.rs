@@ -1,6 +1,7 @@
 pub use error::UgcDownloadToLocationError;
 
 use crate::{steam::SteamResult, string_ext::FromUtf8NulTruncating, AppId, Client, SteamId};
+use futures::Future;
 use snafu::{ensure, ResultExt};
 use std::ffi::CString;
 use steamworks_sys as sys;
@@ -9,49 +10,53 @@ use steamworks_sys as sys;
 pub struct UgcHandle(sys::UGCHandle_t);
 
 impl UgcHandle {
-    pub async fn download_to_location(
+    pub fn download_to_location(
         self,
         client: Client,
         location: impl Into<Vec<u8>>,
         priority: u32,
-    ) -> Result<DownloadUGCResult, UgcDownloadToLocationError> {
-        let location = CString::new(location.into()).context(error::Nul)?;
+    ) -> impl Future<Output = Result<DownloadUGCResult, UgcDownloadToLocationError>> + Send + Sync
+    {
+        let location = CString::new(location.into());
+        async move {
+            let location = location.context(error::Nul)?;
 
-        let response: sys::RemoteStorageDownloadUGCResult_t = unsafe {
-            client
-                .future_from_call_result_fn(
-                    sys::RemoteStorageDownloadUGCResult_t_k_iCallback,
-                    || {
-                        sys::SteamAPI_ISteamRemoteStorage_UGCDownloadToLocation(
-                            client.0.remote_storage,
-                            self.0,
-                            location.as_ptr(),
-                            priority,
-                        )
-                    },
-                )
-                .await
-        };
+            let response: sys::RemoteStorageDownloadUGCResult_t = unsafe {
+                client
+                    .future_from_call_result_fn(
+                        sys::RemoteStorageDownloadUGCResult_t_k_iCallback,
+                        || {
+                            sys::SteamAPI_ISteamRemoteStorage_UGCDownloadToLocation(
+                                client.0.remote_storage,
+                                self.0,
+                                location.as_ptr(),
+                                priority,
+                            )
+                        },
+                    )
+                    .await
+            };
 
-        {
-            let result = SteamResult::from_inner(response.m_eResult);
+            {
+                let result = SteamResult::from_inner(response.m_eResult);
 
-            ensure!(
-                result == SteamResult::OK,
-                error::UGCDownloadToLocation {
-                    steam_result: result,
-                }
-            );
+                ensure!(
+                    result == SteamResult::OK,
+                    error::UGCDownloadToLocation {
+                        steam_result: result,
+                    }
+                );
+            }
+
+            Ok(DownloadUGCResult {
+                app_id: response.m_nAppID.into(),
+                size_in_bytes: response.m_nSizeInBytes,
+                filename: String::from_utf8_nul_truncating(&response.m_pchFileName[..]).expect(
+                    "Filename returned in RemoteStorageDownloadUGCResult_t was not valid UTF-8",
+                ),
+                steam_id_owner: SteamId::new(response.m_ulSteamIDOwner),
+            })
         }
-
-        Ok(DownloadUGCResult {
-            app_id: response.m_nAppID.into(),
-            size_in_bytes: response.m_nSizeInBytes,
-            filename: String::from_utf8_nul_truncating(&response.m_pchFileName[..]).expect(
-                "Filename returned in RemoteStorageDownloadUGCResult_t was not valid UTF-8",
-            ),
-            steam_id_owner: SteamId::new(response.m_ulSteamIDOwner),
-        })
     }
 
     pub(crate) fn from_inner(handle: sys::UGCHandle_t) -> Option<Self> {

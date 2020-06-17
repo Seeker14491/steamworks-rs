@@ -1,6 +1,6 @@
 use crate::{callbacks::PersonaStateChangeFlags, Client};
 use enum_primitive_derive::Primitive;
-use futures::StreamExt;
+use futures::{Future, StreamExt};
 use num_traits::FromPrimitive;
 use std::{
     cmp::Ordering,
@@ -40,38 +40,41 @@ impl SteamId {
         id.into()
     }
 
-    pub async fn persona_name(self, client: &Client) -> String {
+    pub fn persona_name(self, client: &Client) -> impl Future<Output = String> + Send + Sync + '_ {
         unsafe {
             let request_in_progress =
                 sys::SteamAPI_ISteamFriends_RequestUserInformation(client.0.friends, self.0, true);
-            if request_in_progress {
-                let mut stream = client.on_persona_state_changed();
-
-                // Check again to make sure the callback wasn't sent before we registered for it
-                let request_in_progress = sys::SteamAPI_ISteamFriends_RequestUserInformation(
-                    client.0.friends,
-                    self.0,
-                    true,
-                );
-
+            async move {
                 if request_in_progress {
-                    loop {
-                        let change = stream.next().await.unwrap();
-                        if change.steam_id == self
-                            && change.change_flags.contains(PersonaStateChangeFlags::NAME)
-                        {
-                            break;
+                    let mut stream = client.on_persona_state_changed();
+
+                    // Check again to make sure the callback wasn't sent before we registered for it
+                    let request_in_progress = sys::SteamAPI_ISteamFriends_RequestUserInformation(
+                        client.0.friends,
+                        self.0,
+                        true,
+                    );
+
+                    if request_in_progress {
+                        loop {
+                            let change = stream.next().await.unwrap();
+                            if change.steam_id == self
+                                && change.change_flags.contains(PersonaStateChangeFlags::NAME)
+                            {
+                                break;
+                            }
                         }
                     }
                 }
+
+                let name =
+                    sys::SteamAPI_ISteamFriends_GetFriendPersonaName(client.0.friends, self.0);
+
+                CStr::from_ptr(name)
+                    .to_owned()
+                    .into_string()
+                    .expect("persona name contained invalid UTF-8")
             }
-
-            let name = sys::SteamAPI_ISteamFriends_GetFriendPersonaName(client.0.friends, self.0);
-
-            CStr::from_ptr(name)
-                .to_owned()
-                .into_string()
-                .expect("persona name contained invalid UTF-8")
         }
     }
 
@@ -376,18 +379,5 @@ impl Display for SteamResult {
         };
 
         write!(f, "{}", error_string)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::testing::assert_value_send;
-
-    #[test]
-    #[ignore]
-    #[allow(unreachable_code)]
-    fn persona_name_send() {
-        assert_value_send(SteamId::persona_name(panic!(), panic!()));
     }
 }

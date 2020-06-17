@@ -36,13 +36,10 @@ pub mod callbacks;
 mod steam;
 mod string_ext;
 
-#[cfg(test)]
-mod testing;
-
 pub use steam::*;
 
 use crate::callbacks::CallbackStorage;
-use futures::Stream;
+use futures::{Future, Stream};
 use smol::Timer;
 use snafu::{ensure, Snafu};
 use std::{
@@ -139,11 +136,14 @@ impl Client {
     ///
     /// Returns an error if the leaderboard name contains nul bytes, is longer than 128 bytes, or if
     /// the leaderboard is not found.
-    pub async fn find_leaderboard(
+    pub fn find_leaderboard(
         &self,
         leaderboard_name: impl Into<Vec<u8>>,
-    ) -> Result<user_stats::LeaderboardHandle, user_stats::FindLeaderboardError> {
-        user_stats::find_leaderboard(self, leaderboard_name).await
+    ) -> impl Future<Output = Result<user_stats::LeaderboardHandle, user_stats::FindLeaderboardError>>
+           + Send
+           + Sync
+           + '_ {
+        user_stats::find_leaderboard(self, leaderboard_name.into())
     }
 
     /// Returns [`ugc::QueryAllUgc`], which follows the builder pattern, allowing you to configure
@@ -238,17 +238,4 @@ pub enum InitError {
     /// The Steamworks API failed to initialize (SteamAPI_Init() returned false)
     #[snafu(display("The Steamworks API failed to initialize (SteamAPI_Init() returned false)"))]
     Other,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::testing::assert_value_send;
-
-    #[test]
-    #[ignore]
-    #[allow(unreachable_code)]
-    fn find_leaderboard_send() {
-        assert_value_send(Client::find_leaderboard(panic!(), []));
-    }
 }
