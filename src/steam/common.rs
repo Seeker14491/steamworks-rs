@@ -41,32 +41,23 @@ impl SteamId {
     }
 
     pub fn persona_name(self, client: &Client) -> impl Future<Output = String> + Send + Sync + '_ {
-        unsafe {
-            let request_in_progress =
-                sys::SteamAPI_ISteamFriends_RequestUserInformation(client.0.friends, self.0, true);
-            async move {
-                if request_in_progress {
-                    let mut stream = client.on_persona_state_changed();
-
-                    // Check again to make sure the callback wasn't sent before we registered for it
-                    let request_in_progress = sys::SteamAPI_ISteamFriends_RequestUserInformation(
-                        client.0.friends,
-                        self.0,
-                        true,
-                    );
-
-                    if request_in_progress {
-                        loop {
-                            let change = stream.next().await.unwrap();
-                            if change.steam_id == self
-                                && change.change_flags.contains(PersonaStateChangeFlags::NAME)
-                            {
-                                break;
-                            }
-                        }
+        let mut persona_state_changes = client.on_persona_state_changed();
+        let request_in_progress = unsafe {
+            sys::SteamAPI_ISteamFriends_RequestUserInformation(client.0.friends, self.0, true)
+        };
+        async move {
+            if request_in_progress {
+                loop {
+                    let change = persona_state_changes.next().await.unwrap();
+                    if change.steam_id == self
+                        && change.change_flags.contains(PersonaStateChangeFlags::NAME)
+                    {
+                        break;
                     }
                 }
+            }
 
+            unsafe {
                 let name =
                     sys::SteamAPI_ISteamFriends_GetFriendPersonaName(client.0.friends, self.0);
 
