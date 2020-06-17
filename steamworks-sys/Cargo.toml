@@ -5,6 +5,6 @@ authors = ["Brian Bowman <seeker14491@gmail.com>"]
 edition = "2018"
 
 [build-dependencies]
-bindgen = "0.52.0"
-cc = "1.0.36"
-dunce = "1.0.0"
+bindgen = "0.54"
+cc = "1"
+dunce = "1"
