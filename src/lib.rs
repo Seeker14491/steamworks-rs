@@ -39,7 +39,7 @@ mod string_ext;
 pub use steam::*;
 
 use crate::callbacks::CallbackStorage;
-use futures::{Future, Stream};
+use futures::{Future, Stream, FutureExt};
 use smol::Timer;
 use snafu::{ensure, Snafu};
 use std::{
@@ -55,6 +55,7 @@ use std::{
     time::Duration,
 };
 use steamworks_sys as sys;
+use futures::future::BoxFuture;
 
 static STEAM_API_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
@@ -139,11 +140,8 @@ impl Client {
     pub fn find_leaderboard(
         &self,
         leaderboard_name: impl Into<Vec<u8>>,
-    ) -> impl Future<Output = Result<user_stats::LeaderboardHandle, user_stats::FindLeaderboardError>>
-           + Send
-           + Sync
-           + '_ {
-        user_stats::find_leaderboard(self, leaderboard_name.into())
+    ) -> BoxFuture<'_, Result<user_stats::LeaderboardHandle, user_stats::FindLeaderboardError>> {
+        user_stats::find_leaderboard(self, leaderboard_name.into()).boxed()
     }
 
     /// Returns [`ugc::QueryAllUgc`], which follows the builder pattern, allowing you to configure

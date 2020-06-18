@@ -100,15 +100,15 @@ impl LeaderboardHandle {
     /// # Panics
     ///
     /// Panics if `details`, if provided, has a length greater than `64`.
-    pub fn upload_leaderboard_score<'out, 'a: 'out, 'b: 'out>(
+    pub fn upload_leaderboard_score<'a>(
         &'a self,
         score: i32,
-        details: Option<&'b [i32]>,
+        details: Option<&'a [i32]>,
         force_update: bool,
     ) -> impl Future<Output = Result<LeaderboardScoreUploaded, UploadLeaderboardScoreError>>
            + Send
            + Sync
-           + 'out {
+           + 'a {
         // Steamworks API: "you may only have one outstanding call to this function at a time"
         static LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
