@@ -6,7 +6,7 @@ import {
   task,
   sh,
   shCapture,
-} from "https://deno.land/x/drake@v1.2.0/mod.ts";
+} from "https://deno.land/x/drake@v1.2.6/mod.ts";
 
 const SHOULD_CARGO_PUBLISH = false;
 const SHOULD_PUSH_DOCS_TO_GITHUB_PAGES = true;
