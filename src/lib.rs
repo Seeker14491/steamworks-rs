@@ -39,6 +39,7 @@ mod string_ext;
 pub use steam::*;
 
 use crate::callbacks::CallbackStorage;
+use az::WrappingCast;
 use futures::{Future, Stream, FutureExt};
 use smol::Timer;
 use snafu::{ensure, Snafu};
@@ -176,7 +177,7 @@ impl Client {
 
     async fn future_from_call_result_fn<CallResult>(
         &self,
-        magic_number: i32,
+        magic_number: impl Copy + WrappingCast<i32>,
         make_call: impl Fn() -> sys::SteamAPICall_t,
     ) -> CallResult {
         let mut callback_data: MaybeUninit<CallResult> = MaybeUninit::zeroed();
@@ -191,7 +192,7 @@ impl Client {
                         api_call,
                         callback_data.as_mut_ptr() as *mut c_void,
                         mem::size_of::<CallResult>().try_into().unwrap(),
-                        magic_number,
+                        magic_number.wrapping_cast(),
                         &mut failed,
                     )
                 };
