@@ -40,7 +40,7 @@ pub use steam::*;
 
 use crate::callbacks::CallbackStorage;
 use az::WrappingCast;
-use futures::{Future, Stream, FutureExt};
+use futures::{future::BoxFuture, FutureExt, Stream};
 use smol::Timer;
 use snafu::{ensure, Snafu};
 use std::{
@@ -56,7 +56,6 @@ use std::{
     time::Duration,
 };
 use steamworks_sys as sys;
-use futures::future::BoxFuture;
 
 static STEAM_API_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
@@ -141,7 +140,8 @@ impl Client {
     pub fn find_leaderboard(
         &self,
         leaderboard_name: impl Into<Vec<u8>>,
-    ) -> BoxFuture<'_, Result<user_stats::LeaderboardHandle, user_stats::FindLeaderboardError>> {
+    ) -> BoxFuture<'_, Result<user_stats::LeaderboardHandle, user_stats::FindLeaderboardError>>
+    {
         user_stats::find_leaderboard(self, leaderboard_name.into()).boxed()
     }
 
