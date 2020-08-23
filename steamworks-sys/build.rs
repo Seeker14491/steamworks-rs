@@ -42,7 +42,7 @@ fn main() {
         }
     } else if triple.contains("darwin") {
         (
-            sdk_loc.join("redistributable_bin/osx32"),
+            sdk_loc.join("redistributable_bin/osx"),
             "libsteam_api.dylib",
         )
     } else {
