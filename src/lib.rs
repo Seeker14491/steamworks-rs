@@ -126,9 +126,9 @@ impl Client {
                 friends: sys::SteamAPI_SteamFriends_v017(),
                 remote_storage: sys::SteamAPI_SteamRemoteStorage_v014(),
                 ugc: sys::SteamAPI_SteamUGC_v014(),
-                user: sys::SteamAPI_SteamUser_v020(),
-                user_stats: sys::SteamAPI_SteamUserStats_v011(),
-                utils: sys::SteamAPI_SteamUtils_v009(),
+                user: sys::SteamAPI_SteamUser_v021(),
+                user_stats: sys::SteamAPI_SteamUserStats_v012(),
+                utils: sys::SteamAPI_SteamUtils_v010(),
             })))
         }
     }
