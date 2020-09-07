@@ -27,6 +27,7 @@
     deprecated_in_future,
     macro_use_extern_crate,
     missing_debug_implementations,
+    unreachable_pub,
     unused_qualifications
 )]
 #![allow(dead_code)]
@@ -36,26 +37,32 @@ pub mod callbacks;
 mod steam;
 mod string_ext;
 
+pub use error::InitError;
 pub use steam::*;
 
-use crate::callbacks::CallbackStorage;
+use crate::callbacks::CallbackDispatchers;
 use az::WrappingCast;
+use derive_more::Deref;
+use fnv::FnvHashMap;
 use futures::{future::BoxFuture, FutureExt, Stream};
-use smol::Timer;
-use snafu::{ensure, Snafu};
+use parking_lot::Mutex;
+use snafu::ensure;
+use static_assertions::assert_impl_all;
 use std::{
     convert::TryInto,
-    ffi::c_void,
+    ffi::{c_void, CStr},
     mem::{self, MaybeUninit},
+    os::raw::c_char,
+    ptr,
     sync::{
         atomic::{self, AtomicBool},
-        mpsc::{self, SyncSender},
         Arc,
     },
     thread,
     time::Duration,
 };
 use steamworks_sys as sys;
+use tracing::{event, Level};
 
 static STEAM_API_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
@@ -65,20 +72,27 @@ static STEAM_API_INITIALIZED: AtomicBool = AtomicBool::new(false);
 #[derive(Debug, Clone)]
 pub struct Client(Arc<ClientInner>);
 
+assert_impl_all!(Client: Send, Sync);
+
 #[derive(Debug)]
 struct ClientInner {
-    thread_shutdown: SyncSender<()>,
-    callback_manager: *mut sys::CallbackManager,
-    friends: *mut sys::ISteamFriends,
-    remote_storage: *mut sys::ISteamRemoteStorage,
-    ugc: *mut sys::ISteamUGC,
-    user: *mut sys::ISteamUser,
-    user_stats: *mut sys::ISteamUserStats,
-    utils: *mut sys::ISteamUtils,
+    thread_shutdown: std::sync::mpsc::SyncSender<()>,
+    callback_dispatchers: CallbackDispatchers,
+    call_result_handles:
+        Mutex<FnvHashMap<sys::SteamAPICall_t, futures::channel::oneshot::Sender<Vec<u8>>>>,
+    friends: SteamworksInterface<sys::ISteamFriends>,
+    remote_storage: SteamworksInterface<sys::ISteamRemoteStorage>,
+    ugc: SteamworksInterface<sys::ISteamUGC>,
+    user: SteamworksInterface<sys::ISteamUser>,
+    user_stats: SteamworksInterface<sys::ISteamUserStats>,
+    utils: SteamworksInterface<sys::ISteamUtils>,
 }
 
-unsafe impl Send for ClientInner {}
-unsafe impl Sync for ClientInner {}
+#[derive(Debug, Copy, Clone, Deref)]
+struct SteamworksInterface<T>(*mut T);
+
+unsafe impl<T> Send for SteamworksInterface<T> {}
+unsafe impl<T> Sync for SteamworksInterface<T> {}
 
 impl Client {
     /// Initializes the Steamworks API, yielding a `Client`.
@@ -88,49 +102,43 @@ impl Client {
     pub fn init() -> Result<Self, InitError> {
         ensure!(
             !STEAM_API_INITIALIZED.swap(true, atomic::Ordering::AcqRel),
-            AlreadyInitialized
+            error::AlreadyInitialized
         );
 
         let success = unsafe { sys::SteamAPI_Init() };
         if !success {
             STEAM_API_INITIALIZED.store(false, atomic::Ordering::Release);
-            return Other.fail();
+            return error::Other.fail();
         }
-
-        let callback_manager = unsafe {
-            sys::steam_rust_register_callbacks(sys::SteamRustCallbacks {
-                onPersonaStateChanged: Some(callbacks::on_persona_state_changed),
-                onSteamShutdown: Some(callbacks::on_steam_shutdown),
-            })
-        };
-
-        let (shutdown_tx, shutdown_rx) = mpsc::sync_channel(0);
-        thread::spawn(move || {
-            smol::run(async {
-                loop {
-                    unsafe { sys::SteamAPI_RunCallbacks() }
-
-                    if let Ok(()) = shutdown_rx.try_recv() {
-                        break;
-                    }
-
-                    Timer::after(Duration::from_millis(1)).await;
-                }
-            });
-        });
 
         unsafe {
-            Ok(Client(Arc::new(ClientInner {
-                thread_shutdown: shutdown_tx,
-                callback_manager,
-                friends: sys::SteamAPI_SteamFriends_v017(),
-                remote_storage: sys::SteamAPI_SteamRemoteStorage_v014(),
-                ugc: sys::SteamAPI_SteamUGC_v014(),
-                user: sys::SteamAPI_SteamUser_v021(),
-                user_stats: sys::SteamAPI_SteamUserStats_v012(),
-                utils: sys::SteamAPI_SteamUtils_v010(),
-            })))
+            sys::SteamAPI_ManualDispatch_Init();
         }
+
+        let utils = unsafe { SteamworksInterface(sys::SteamAPI_SteamUtils_v010()) };
+        unsafe {
+            sys::SteamAPI_ISteamUtils_SetWarningMessageHook(*utils, Some(warning_message_hook));
+        }
+
+        let (shutdown_tx, shutdown_rx) = std::sync::mpsc::sync_channel(0);
+        let client = unsafe {
+            Client(Arc::new(ClientInner {
+                thread_shutdown: shutdown_tx,
+                callback_dispatchers: CallbackDispatchers::new(),
+                call_result_handles: Mutex::new(FnvHashMap::default()),
+                friends: SteamworksInterface(sys::SteamAPI_SteamFriends_v017()),
+                remote_storage: SteamworksInterface(sys::SteamAPI_SteamRemoteStorage_v014()),
+                ugc: SteamworksInterface(sys::SteamAPI_SteamUGC_v014()),
+                user: SteamworksInterface(sys::SteamAPI_SteamUser_v021()),
+                user_stats: SteamworksInterface(sys::SteamAPI_SteamUserStats_v012()),
+                utils,
+            }))
+        };
+
+        start_worker_thread(client.clone(), shutdown_rx);
+        event!(Level::DEBUG, "Steamworks API initialized");
+
+        Ok(client)
     }
 
     /// <https://partner.steamgames.com/doc/api/ISteamUserStats#FindLeaderboard>
@@ -153,12 +161,12 @@ impl Client {
 
     /// <https://partner.steamgames.com/doc/api/ISteamUtils#GetAppID>
     pub fn app_id(&self) -> AppId {
-        unsafe { sys::SteamAPI_ISteamUtils_GetAppID(self.0.utils).into() }
+        unsafe { sys::SteamAPI_ISteamUtils_GetAppID(*self.0.utils).into() }
     }
 
     /// <https://partner.steamgames.com/doc/api/ISteamUser#GetSteamID>
     pub fn steam_id(&self) -> SteamId {
-        let id = unsafe { sys::SteamAPI_ISteamUser_GetSteamID(self.0.user) };
+        let id = unsafe { sys::SteamAPI_ISteamUser_GetSteamID(*self.0.user) };
 
         id.into()
     }
@@ -167,52 +175,27 @@ impl Client {
     pub fn on_persona_state_changed(
         &self,
     ) -> impl Stream<Item = callbacks::PersonaStateChange> + Send {
-        self.get_callback_stream(&callbacks::PERSONA_STATE_CHANGED)
+        callbacks::register_to_receive_callback(&self.0.callback_dispatchers.persona_state_change)
     }
 
     /// <https://partner.steamgames.com/doc/api/ISteamUtils#SteamShutdown_t>
     pub fn on_steam_shutdown(&self) -> impl Stream<Item = ()> + Send {
-        self.get_callback_stream(&callbacks::STEAM_SHUTDOWN)
+        callbacks::register_to_receive_callback(&self.0.callback_dispatchers.steam_shutdown)
     }
 
-    async fn future_from_call_result_fn<CallResult>(
+    async unsafe fn register_for_call_result<CallResult: Copy>(
         &self,
-        magic_number: impl Copy + WrappingCast<i32>,
-        make_call: impl Fn() -> sys::SteamAPICall_t,
+        handle: sys::SteamAPICall_t,
     ) -> CallResult {
-        let mut callback_data: MaybeUninit<CallResult> = MaybeUninit::zeroed();
-        let mut failed = true;
-        while failed {
-            let api_call = make_call();
-            loop {
-                Timer::after(Duration::from_millis(5)).await;
-                let completed = unsafe {
-                    sys::SteamAPI_ISteamUtils_GetAPICallResult(
-                        self.0.utils,
-                        api_call,
-                        callback_data.as_mut_ptr() as *mut c_void,
-                        mem::size_of::<CallResult>().try_into().unwrap(),
-                        magic_number.wrapping_cast(),
-                        &mut failed,
-                    )
-                };
+        let (tx, rx) = futures::channel::oneshot::channel::<Vec<u8>>();
+        self.0.call_result_handles.lock().insert(handle, tx);
+        rx.map(|result| {
+            let bytes = result.unwrap();
 
-                if completed {
-                    break;
-                }
-            }
-        }
-
-        unsafe { callback_data.assume_init() }
-    }
-
-    fn get_callback_stream<T: Send>(
-        &self,
-        storage: &CallbackStorage<T>,
-    ) -> impl Stream<Item = T> + Send {
-        let (tx, rx) = futures::channel::mpsc::unbounded();
-        storage.lock().insert(tx);
-        rx
+            assert_eq!(bytes.len(), mem::size_of::<CallResult>());
+            ptr::read_unaligned(bytes.as_ptr() as *const CallResult)
+        })
+        .await
     }
 }
 
@@ -220,21 +203,121 @@ impl Drop for ClientInner {
     fn drop(&mut self) {
         self.thread_shutdown.send(()).unwrap();
         unsafe {
-            sys::steam_rust_unregister_callbacks(self.callback_manager);
             sys::SteamAPI_Shutdown();
         }
 
         STEAM_API_INITIALIZED.store(false, atomic::Ordering::Release);
+        event!(Level::DEBUG, "Steamworks API shut down");
     }
 }
 
-#[derive(Debug, Snafu)]
-pub enum InitError {
-    /// Tried to initialize Steam API when it was already initialized
-    #[snafu(display("Tried to initialize Steam API when it was already initialized"))]
-    AlreadyInitialized,
+unsafe extern "C" fn warning_message_hook(severity: i32, debug_text: *const c_char) {
+    let debug_text = CStr::from_ptr(debug_text);
+    if severity == 1 {
+        event!(Level::WARN, ?debug_text, "Steam API warning");
+    } else {
+        event!(Level::INFO, ?debug_text, "Steam API message");
+    }
+}
 
-    /// The Steamworks API failed to initialize (SteamAPI_Init() returned false)
-    #[snafu(display("The Steamworks API failed to initialize (SteamAPI_Init() returned false)"))]
-    Other,
+fn start_worker_thread(client: Client, shutdown_rx: std::sync::mpsc::Receiver<()>) {
+    thread::spawn(move || {
+        unsafe {
+            let steam_pipe = sys::SteamAPI_GetHSteamPipe();
+            loop {
+                sys::SteamAPI_ManualDispatch_RunFrame(steam_pipe);
+                let mut callback_msg: MaybeUninit<sys::CallbackMsg_t> = MaybeUninit::uninit();
+                while sys::SteamAPI_ManualDispatch_GetNextCallback(
+                    steam_pipe,
+                    callback_msg.as_mut_ptr(),
+                ) {
+                    let callback = callback_msg.assume_init();
+
+                    // Check if we're dispatching a call result or a callback
+                    if callback.m_iCallback
+                        == sys::SteamAPICallCompleted_t_k_iCallback.wrapping_cast()
+                    {
+                        // It's a call result
+
+                        assert!(!callback.m_pubParam.is_null());
+                        assert_eq!(
+                            callback
+                                .m_pubParam
+                                .align_offset(mem::align_of::<sys::SteamAPICallCompleted_t>()),
+                            0
+                        );
+                        let call_completed =
+                            &mut *(callback.m_pubParam as *mut sys::SteamAPICallCompleted_t);
+
+                        let mut call_result_buf =
+                            vec![0_u8; call_completed.m_cubParam.try_into().unwrap()];
+                        let mut failed = true;
+                        if sys::SteamAPI_ManualDispatch_GetAPICallResult(
+                            steam_pipe,
+                            call_completed.m_hAsyncCall,
+                            call_result_buf.as_mut_ptr() as *mut c_void,
+                            call_result_buf.len().try_into().unwrap(),
+                            call_completed.m_iCallback,
+                            &mut failed,
+                        ) {
+                            if failed {
+                                panic!(
+                                    "'SteamAPI_ManualDispatch_GetAPICallResult' indicated failure by returning a value of 'true' for its 'pbFailed' parameter"
+                                );
+                            }
+
+                            let call_id = call_completed.m_hAsyncCall;
+                            match client.0.call_result_handles.lock().remove(&call_id) {
+                                Some(tx) => {
+                                    tx.send(call_result_buf).ok();
+                                }
+                                None => {
+                                    event!(
+                                        Level::WARN,
+                                        SteamAPICallCompleted_t = ?call_completed,
+                                        "a CallResult became available, but its recipient was not found"
+                                    );
+                                }
+                            }
+                        } else {
+                            panic!("'SteamAPI_ManualDispatch_GetAPICallResult' returned false");
+                        }
+                    } else {
+                        // It's a callback
+
+                        callbacks::dispatch_callbacks(&client.0.callback_dispatchers, callback);
+                    }
+
+                    sys::SteamAPI_ManualDispatch_FreeLastCallback(steam_pipe);
+                }
+
+                if let Ok(()) = shutdown_rx.try_recv() {
+                    event!(
+                        Level::DEBUG,
+                        "worker thread shutting down due to receiving shutdown signal"
+                    );
+
+                    break;
+                }
+
+                thread::sleep(Duration::from_millis(1));
+            }
+        }
+    });
+}
+
+mod error {
+    #[derive(Debug, snafu::Snafu)]
+    #[snafu(visibility(pub(crate)))]
+    pub enum InitError {
+        /// Tried to initialize Steam API when it was already initialized
+        #[snafu(display("Tried to initialize Steam API when it was already initialized"))]
+        AlreadyInitialized,
+
+        /// The Steamworks API failed to initialize (SteamAPI_Init() returned false)
+        #[snafu(display(
+            "The Steamworks API failed to initialize (SteamAPI_Init() returned false)"
+        ))]
+        Other,
+    }
 }

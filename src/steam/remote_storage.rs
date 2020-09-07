@@ -15,26 +15,20 @@ impl UgcHandle {
         client: Client,
         location: impl Into<Vec<u8>>,
         priority: u32,
-    ) -> impl Future<Output = Result<DownloadUGCResult, UgcDownloadToLocationError>> + Send + Sync
-    {
+    ) -> impl Future<Output = Result<DownloadUGCResult, UgcDownloadToLocationError>> + Send {
         let location = CString::new(location.into());
         async move {
             let location = location.context(error::Nul)?;
 
             let response: sys::RemoteStorageDownloadUGCResult_t = unsafe {
-                client
-                    .future_from_call_result_fn(
-                        sys::RemoteStorageDownloadUGCResult_t_k_iCallback,
-                        || {
-                            sys::SteamAPI_ISteamRemoteStorage_UGCDownloadToLocation(
-                                client.0.remote_storage,
-                                self.0,
-                                location.as_ptr(),
-                                priority,
-                            )
-                        },
-                    )
-                    .await
+                let handle = sys::SteamAPI_ISteamRemoteStorage_UGCDownloadToLocation(
+                    *client.0.remote_storage,
+                    self.0,
+                    location.as_ptr(),
+                    priority,
+                );
+
+                client.register_for_call_result(handle).await
             };
 
             {
