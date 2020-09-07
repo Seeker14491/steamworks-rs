@@ -6,6 +6,7 @@ use crate::{
     Client,
 };
 use futures::{lock::Mutex, Future};
+use futures_intrusive::sync::Semaphore;
 use once_cell::sync::Lazy;
 use snafu::{ensure, ResultExt};
 use std::{cmp, convert::TryInto, ffi::CString, mem::MaybeUninit, ptr};
@@ -38,7 +39,7 @@ impl LeaderboardHandle {
         range_start: u32,
         range_end: u32,
         max_details: u8,
-    ) -> impl Future<Output = Vec<LeaderboardEntry>> + Send + Sync + '_ {
+    ) -> impl Future<Output = Vec<LeaderboardEntry>> + Send + '_ {
         assert!(range_start > 0);
         assert!(range_end >= range_start);
 
@@ -64,7 +65,7 @@ impl LeaderboardHandle {
         range_start: i32,
         range_end: i32,
         max_details: u8,
-    ) -> impl Future<Output = Vec<LeaderboardEntry>> + Send + Sync + '_ {
+    ) -> impl Future<Output = Vec<LeaderboardEntry>> + Send + '_ {
         assert!(range_end >= range_start);
 
         self.download_entry_range(
@@ -81,7 +82,7 @@ impl LeaderboardHandle {
     pub fn download_friends(
         &self,
         max_details: u8,
-    ) -> impl Future<Output = Vec<LeaderboardEntry>> + Send + Sync + '_ {
+    ) -> impl Future<Output = Vec<LeaderboardEntry>> + Send + '_ {
         self.download_entry_range(
             sys::ELeaderboardDataRequest_k_ELeaderboardDataRequestFriends,
             0,
@@ -105,10 +106,8 @@ impl LeaderboardHandle {
         score: i32,
         details: Option<&'a [i32]>,
         force_update: bool,
-    ) -> impl Future<Output = Result<LeaderboardScoreUploaded, UploadLeaderboardScoreError>>
-           + Send
-           + Sync
-           + 'a {
+    ) -> impl Future<Output = Result<LeaderboardScoreUploaded, UploadLeaderboardScoreError>> + Send + 'a
+    {
         // Steamworks API: "you may only have one outstanding call to this function at a time"
         static LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
@@ -122,7 +121,7 @@ impl LeaderboardHandle {
             Some(xs) => {
                 let len = xs.len();
                 if len > 64 {
-                    panic!(format!("The details passed in to 'upload_leaderboard_score' has a length of {}, but the limit is 64", len));
+                    panic!("The details passed in to 'upload_leaderboard_score' has a length of {}, but the limit is 64", len);
                 }
                 i32::try_from(len).unwrap()
             }
@@ -132,22 +131,18 @@ impl LeaderboardHandle {
         async move {
             let _guard = LOCK.lock().await;
 
-            let response: sys::LeaderboardScoreUploaded_t = self
-                .client
-                .future_from_call_result_fn(
-                    sys::LeaderboardScoreUploaded_t_k_iCallback,
-                    || unsafe {
-                        sys::SteamAPI_ISteamUserStats_UploadLeaderboardScore(
-                            self.client.0.user_stats,
-                            self.handle,
-                            leaderboard_upload_score_method,
-                            score,
-                            details.map(|xs| xs.as_ptr()).unwrap_or(ptr::null()),
-                            details_count,
-                        )
-                    },
-                )
-                .await;
+            let response: sys::LeaderboardScoreUploaded_t = unsafe {
+                let handle = sys::SteamAPI_ISteamUserStats_UploadLeaderboardScore(
+                    *self.client.0.user_stats,
+                    self.handle,
+                    leaderboard_upload_score_method,
+                    score,
+                    details.map(|xs| xs.as_ptr()).unwrap_or(ptr::null()),
+                    details_count,
+                );
+
+                self.client.register_for_call_result(handle).await
+            };
 
             if response.m_bSuccess == 1 {
                 Ok(LeaderboardScoreUploaded {
@@ -167,24 +162,20 @@ impl LeaderboardHandle {
         range_start: i32,
         range_end: i32,
         max_details: u8,
-    ) -> impl Future<Output = Vec<LeaderboardEntry>> + Send + Sync + '_ {
+    ) -> impl Future<Output = Vec<LeaderboardEntry>> + Send + '_ {
         let max_details = cmp::min(max_details, 64);
         async move {
-            let response: sys::LeaderboardScoresDownloaded_t = self
-                .client
-                .future_from_call_result_fn(
-                    sys::LeaderboardScoresDownloaded_t_k_iCallback,
-                    || unsafe {
-                        sys::SteamAPI_ISteamUserStats_DownloadLeaderboardEntries(
-                            self.client.0.user_stats,
-                            self.handle,
-                            request_type,
-                            range_start,
-                            range_end,
-                        )
-                    },
-                )
-                .await;
+            let response: sys::LeaderboardScoresDownloaded_t = unsafe {
+                let handle = sys::SteamAPI_ISteamUserStats_DownloadLeaderboardEntries(
+                    *self.client.0.user_stats,
+                    self.handle,
+                    request_type,
+                    range_start,
+                    range_end,
+                );
+
+                self.client.register_for_call_result(handle).await
+            };
 
             let mut entries: Vec<LeaderboardEntry> =
                 Vec::with_capacity(response.m_cEntryCount as usize);
@@ -193,7 +184,7 @@ impl LeaderboardHandle {
                 let mut details = vec![0; max_details as usize];
                 let success = unsafe {
                     sys::SteamAPI_ISteamUserStats_GetDownloadedLeaderboardEntry(
-                        self.client.0.user_stats,
+                        *self.client.0.user_stats,
                         response.m_hSteamLeaderboardEntries,
                         i,
                         raw_entry.as_mut_ptr(),
@@ -258,7 +249,7 @@ mod error {
         TooLong { length: usize },
 
         /// The specified leaderboard was not found
-        #[snafu(display("The leaderboard '{:?}' was not found", leaderboard_name))]
+        #[snafu(display("The leaderboard {:?} was not found", leaderboard_name))]
         NotFound { leaderboard_name: std::ffi::CString },
     }
 
@@ -280,7 +271,12 @@ mod error {
 pub(crate) fn find_leaderboard(
     client: &Client,
     leaderboard_name: Vec<u8>,
-) -> impl Future<Output = Result<LeaderboardHandle, FindLeaderboardError>> + Send + Sync + '_ {
+) -> impl Future<Output = Result<LeaderboardHandle, FindLeaderboardError>> + Send + '_ {
+    // The Steamworks API seems to have an undocumented limit on the number of concurrent calls
+    // to the `FindLeaderboard()` function, after which it starts returning leaderboard-not-found
+    // errors. So we limit the number of concurrent calls to an experimentally-determined value.
+    static SEMAPHORE: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(false, 256));
+
     let leaderboard_name = CString::new(leaderboard_name);
     async move {
         let leaderboard_name = leaderboard_name.context(error::Nul)?;
@@ -292,14 +288,15 @@ pub(crate) fn find_leaderboard(
             }
         );
 
-        let response: sys::LeaderboardFindResult_t = client
-            .future_from_call_result_fn(sys::LeaderboardFindResult_t_k_iCallback, || unsafe {
-                sys::SteamAPI_ISteamUserStats_FindLeaderboard(
-                    client.0.user_stats,
-                    leaderboard_name_bytes.as_ptr() as *const i8,
-                )
-            })
-            .await;
+        let _releaser = SEMAPHORE.acquire(1).await;
+        let response: sys::LeaderboardFindResult_t = unsafe {
+            let handle = sys::SteamAPI_ISteamUserStats_FindLeaderboard(
+                *client.0.user_stats,
+                leaderboard_name_bytes.as_ptr() as *const i8,
+            );
+
+            client.register_for_call_result(handle).await
+        };
 
         ensure!(
             response.m_bLeaderboardFound != 0,

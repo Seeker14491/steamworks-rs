@@ -40,10 +40,10 @@ impl SteamId {
         id.into()
     }
 
-    pub fn persona_name(self, client: &Client) -> impl Future<Output = String> + Send + Sync + '_ {
+    pub fn persona_name(self, client: &Client) -> impl Future<Output = String> + Send + '_ {
         let mut persona_state_changes = client.on_persona_state_changed();
         let request_in_progress = unsafe {
-            sys::SteamAPI_ISteamFriends_RequestUserInformation(client.0.friends, self.0, true)
+            sys::SteamAPI_ISteamFriends_RequestUserInformation(*client.0.friends, self.0, true)
         };
         async move {
             if request_in_progress {
@@ -59,7 +59,7 @@ impl SteamId {
 
             unsafe {
                 let name =
-                    sys::SteamAPI_ISteamFriends_GetFriendPersonaName(client.0.friends, self.0);
+                    sys::SteamAPI_ISteamFriends_GetFriendPersonaName(*client.0.friends, self.0);
 
                 CStr::from_ptr(name)
                     .to_owned()

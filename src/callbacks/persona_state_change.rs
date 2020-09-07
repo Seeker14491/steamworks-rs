@@ -1,12 +1,9 @@
-use crate::steam::SteamId;
+use crate::{
+    callbacks::{CallbackDispatcher, CallbackStorage},
+    steam::SteamId,
+};
 use bitflags::bitflags;
-use once_cell::sync::Lazy;
-use parking_lot::Mutex;
-use slotmap::DenseSlotMap;
 use steamworks_sys as sys;
-
-pub(crate) type CallbackStorage<T> =
-    Lazy<Mutex<DenseSlotMap<slotmap::DefaultKey, futures::channel::mpsc::UnboundedSender<T>>>>;
 
 /// <https://partner.steamgames.com/doc/api/ISteamFriends#PersonaStateChange_t>
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -36,40 +33,21 @@ bitflags! {
     }
 }
 
-pub(crate) static PERSONA_STATE_CHANGED: CallbackStorage<PersonaStateChange> =
-    Lazy::new(|| Mutex::new(DenseSlotMap::new()));
+#[derive(Debug, Default)]
+pub(crate) struct PersonaStateChangeDispatcher(CallbackStorage<PersonaStateChange>);
 
-pub(crate) unsafe extern "C" fn on_persona_state_changed(params: *mut sys::PersonaStateChange_t) {
-    let params = *params;
-    let params = PersonaStateChange {
-        steam_id: params.m_ulSteamID.into(),
-        change_flags: PersonaStateChangeFlags::from_bits_truncate(params.m_nChangeFlags as u32),
-    };
+impl CallbackDispatcher for PersonaStateChangeDispatcher {
+    type RawCallbackData = sys::PersonaStateChange_t;
+    type MappedCallbackData = PersonaStateChange;
 
-    forward_callback(&PERSONA_STATE_CHANGED, params);
-}
-
-pub(crate) static STEAM_SHUTDOWN: CallbackStorage<()> =
-    Lazy::new(|| Mutex::new(DenseSlotMap::new()));
-
-pub(crate) unsafe extern "C" fn on_steam_shutdown(_: *mut sys::SteamShutdown_t) {
-    forward_callback(&STEAM_SHUTDOWN, ());
-}
-
-fn forward_callback<T: Copy + Send + 'static>(storage: &CallbackStorage<T>, params: T) {
-    let mut keys_to_remove = Vec::new();
-    let mut map = storage.lock();
-    for (k, tx) in map.iter() {
-        if let Err(e) = tx.unbounded_send(params) {
-            if e.is_disconnected() {
-                keys_to_remove.push(k);
-            } else {
-                panic!(e);
-            }
-        }
+    fn storage(&self) -> &CallbackStorage<PersonaStateChange> {
+        &self.0
     }
 
-    for k in &keys_to_remove {
-        map.remove(*k);
+    fn map_callback_data(raw: &sys::PersonaStateChange_t) -> PersonaStateChange {
+        PersonaStateChange {
+            steam_id: raw.m_ulSteamID.into(),
+            change_flags: PersonaStateChangeFlags::from_bits_truncate(raw.m_nChangeFlags as u32),
+        }
     }
 }
