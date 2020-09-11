@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["steamworks"] = [{"text":"impl ErrorCompat for UgcDownloadToLocationError","synthetic":false,"types":[]},{"text":"impl ErrorCompat for QueryAllUgcError","synthetic":false,"types":[]},{"text":"impl ErrorCompat for FindLeaderboardError","synthetic":false,"types":[]},{"text":"impl ErrorCompat for InitError","synthetic":false,"types":[]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

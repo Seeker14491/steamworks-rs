@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["PersonaStateChange","https://partner.steamgames.com/doc/api/ISteamFriends#PersonaStateChange_t"],["PersonaStateChangeFlags","https://partner.steamgames.com/doc/api/ISteamFriends#EPersonaChange"]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["FindLeaderboardError",""]],"struct":[["LeaderboardEntry",""],["LeaderboardHandle","A handle to a Steam leaderboard"],["LeaderboardScoreUploaded",""],["UploadLeaderboardScoreError",""]]});

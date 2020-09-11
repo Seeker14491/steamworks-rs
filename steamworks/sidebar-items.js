@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["InitError",""],["SteamResult",""]],"mod":[["callbacks",""],["remote_storage",""],["ugc",""],["user_stats",""]],"struct":[["AppId",""],["Client","The core type of this crate, representing an initialized Steamworks API."],["SteamId",""]]});

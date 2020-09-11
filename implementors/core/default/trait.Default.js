@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["steamworks"] = [{"text":"impl Default for Tags","synthetic":false,"types":[]},{"text":"impl Default for LeaderboardScoreUploaded","synthetic":false,"types":[]},{"text":"impl Default for UploadLeaderboardScoreError","synthetic":false,"types":[]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

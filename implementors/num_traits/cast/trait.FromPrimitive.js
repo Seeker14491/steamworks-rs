@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["steamworks"] = [{"text":"impl FromPrimitive for MatchingUgcType","synthetic":false,"types":[]},{"text":"impl FromPrimitive for WorkshopFileType","synthetic":false,"types":[]},{"text":"impl FromPrimitive for PublishedFileVisibility","synthetic":false,"types":[]},{"text":"impl FromPrimitive for SteamResult","synthetic":false,"types":[]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

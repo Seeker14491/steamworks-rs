@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["MatchingUgcType",""],["PublishedFileVisibility",""],["QueryAllUgcError",""],["QueryType",""],["WorkshopFileType",""]],"struct":[["PublishedFileId",""],["QueryAllUgc","A builder for configuring a request to query all UGC."],["Tags",""],["UgcDetails",""]]});
