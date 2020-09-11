@@ -27,7 +27,6 @@
     deprecated_in_future,
     macro_use_extern_crate,
     missing_debug_implementations,
-    unreachable_pub,
     unused_qualifications
 )]
 #![allow(dead_code)]
