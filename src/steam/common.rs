@@ -1,13 +1,12 @@
-use crate::{callbacks::PersonaStateChangeFlags, Client};
+use crate::callbacks::PersonaStateChangeFlags;
+use crate::Client;
 use enum_primitive_derive::Primitive;
 use futures::{Future, StreamExt};
 use num_traits::FromPrimitive;
-use std::{
-    cmp::Ordering,
-    ffi::CStr,
-    fmt::{self, Debug, Display, Formatter},
-    hash::{Hash, Hasher},
-};
+use std::cmp::Ordering;
+use std::ffi::CStr;
+use std::fmt::{self, Debug, Display, Formatter};
+use std::hash::{Hash, Hasher};
 use steamworks_sys as sys;
 use steamworks_sys::CSteamID;
 

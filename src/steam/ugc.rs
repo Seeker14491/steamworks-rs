@@ -1,20 +1,22 @@
 pub use error::QueryAllUgcError;
 
-use crate::{
-    steam::{remote_storage::UgcHandle, AppId, SteamId, SteamResult},
-    string_ext::FromUtf8NulTruncating,
-    Client,
-};
-use chrono::{offset::TimeZone, DateTime, Utc};
+use crate::steam::remote_storage::UgcHandle;
+use crate::steam::{AppId, SteamId, SteamResult};
+use crate::string_ext::FromUtf8NulTruncating;
+use crate::Client;
+use chrono::offset::TimeZone;
+use chrono::{DateTime, Utc};
 use derive_more::{From, Into};
 use enum_primitive_derive::Primitive;
 use futures::Stream;
 use genawaiter::sync::Gen;
 use num_traits::FromPrimitive;
-use std::{
-    cmp, collections::BTreeMap, convert::TryFrom, ffi::CString, mem::MaybeUninit, os::raw::c_char,
-    ptr, str,
-};
+use std::collections::BTreeMap;
+use std::convert::TryFrom;
+use std::ffi::CString;
+use std::mem::MaybeUninit;
+use std::os::raw::c_char;
+use std::{cmp, ptr, str};
 use steamworks_sys as sys;
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -63,13 +65,6 @@ pub enum MatchingUgcType {
     ControllerBindings = sys::EUGCMatchingUGCType_k_EUGCMatchingUGCType_ControllerBindings,
     GameManagedItems = sys::EUGCMatchingUGCType_k_EUGCMatchingUGCType_GameManagedItems,
     All = sys::EUGCMatchingUGCType_k_EUGCMatchingUGCType_All,
-}
-
-impl MatchingUgcType {
-    pub(crate) fn from_inner(inner: sys::EUGCMatchingUGCType) -> Self {
-        MatchingUgcType::from_i32(inner)
-            .unwrap_or_else(|| panic!("Unknown EUGCMatchingUGCType discriminant: {}", inner))
-    }
 }
 
 impl From<MatchingUgcType> for sys::EUGCMatchingUGCType {
@@ -377,7 +372,7 @@ impl QueryAllUgc {
                 }
             }
 
-            let max_results = self.max_results.unwrap_or(u32::max_value());
+            let max_results = self.max_results.unwrap_or(u32::MAX);
 
             let client = self.client.clone();
             let mut cursor: Option<Vec<c_char>> = None;

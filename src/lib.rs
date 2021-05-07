@@ -29,12 +29,6 @@
     missing_debug_implementations,
     unused_qualifications
 )]
-#![allow(dead_code)]
-
-pub mod callbacks;
-
-mod steam;
-mod string_ext;
 
 pub use error::InitError;
 pub use steam::*;
@@ -43,25 +37,26 @@ use crate::callbacks::CallbackDispatchers;
 use az::WrappingCast;
 use derive_more::Deref;
 use fnv::FnvHashMap;
-use futures::{future::BoxFuture, FutureExt, Stream};
+use futures::future::BoxFuture;
+use futures::{FutureExt, Stream};
 use parking_lot::Mutex;
 use snafu::ensure;
 use static_assertions::assert_impl_all;
-use std::{
-    convert::TryInto,
-    ffi::{c_void, CStr},
-    mem::{self, MaybeUninit},
-    os::raw::c_char,
-    ptr,
-    sync::{
-        atomic::{self, AtomicBool},
-        Arc,
-    },
-    thread,
-    time::Duration,
-};
+use std::convert::TryInto;
+use std::ffi::{c_void, CStr};
+use std::mem::{self, MaybeUninit};
+use std::os::raw::c_char;
+use std::sync::atomic::{self, AtomicBool};
+use std::sync::Arc;
+use std::time::Duration;
+use std::{ptr, thread};
 use steamworks_sys as sys;
 use tracing::{event, Level};
+
+pub mod callbacks;
+
+mod steam;
+mod string_ext;
 
 static STEAM_API_INITIALIZED: AtomicBool = AtomicBool::new(false);
 

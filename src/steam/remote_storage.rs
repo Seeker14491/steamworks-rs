@@ -1,6 +1,8 @@
 pub use error::UgcDownloadToLocationError;
 
-use crate::{steam::SteamResult, string_ext::FromUtf8NulTruncating, AppId, Client, SteamId};
+use crate::steam::SteamResult;
+use crate::string_ext::FromUtf8NulTruncating;
+use crate::{AppId, Client, SteamId};
 use futures::Future;
 use snafu::{ensure, ResultExt};
 use std::ffi::CString;
@@ -59,10 +61,6 @@ impl UgcHandle {
         } else {
             Some(UgcHandle(handle))
         }
-    }
-
-    pub(crate) fn to_inner(self) -> sys::UGCHandle_t {
-        self.0
     }
 }
 

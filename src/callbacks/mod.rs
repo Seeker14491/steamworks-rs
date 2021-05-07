@@ -1,13 +1,14 @@
-mod persona_state_change;
-
 pub use persona_state_change::*;
 
 use az::WrappingCast;
 use futures::Stream;
 use parking_lot::Mutex;
 use slotmap::DenseSlotMap;
-use std::{convert::TryFrom, mem};
+use std::convert::TryFrom;
+use std::mem;
 use steamworks_sys as sys;
+
+mod persona_state_change;
 
 pub(crate) type CallbackStorage<T> =
     Mutex<DenseSlotMap<slotmap::DefaultKey, futures::channel::mpsc::UnboundedSender<T>>>;
@@ -71,7 +72,7 @@ pub(crate) trait CallbackDispatcher {
         let mut storage = self.storage().lock();
         storage.retain(|_key, tx| match tx.unbounded_send(mapped.clone()) {
             Err(e) if e.is_disconnected() => false,
-            Err(e) => panic!(e),
+            Err(e) => panic!("{}", e),
             Ok(()) => true,
         });
     }

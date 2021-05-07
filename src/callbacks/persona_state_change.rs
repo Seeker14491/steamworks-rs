@@ -1,7 +1,5 @@
-use crate::{
-    callbacks::{CallbackDispatcher, CallbackStorage},
-    steam::SteamId,
-};
+use crate::callbacks::{CallbackDispatcher, CallbackStorage};
+use crate::steam::SteamId;
 use bitflags::bitflags;
 use steamworks_sys as sys;
 

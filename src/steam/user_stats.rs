@@ -1,15 +1,18 @@
 pub use error::{FindLeaderboardError, UploadLeaderboardScoreError};
 use std::convert::TryFrom;
 
-use crate::{
-    steam::{remote_storage::UgcHandle, SteamId},
-    Client,
-};
-use futures::{lock::Mutex, Future};
+use crate::steam::remote_storage::UgcHandle;
+use crate::steam::SteamId;
+use crate::Client;
+use futures::lock::Mutex;
+use futures::Future;
 use futures_intrusive::sync::Semaphore;
 use once_cell::sync::Lazy;
 use snafu::{ensure, ResultExt};
-use std::{cmp, convert::TryInto, ffi::CString, mem::MaybeUninit, ptr};
+use std::convert::TryInto;
+use std::ffi::CString;
+use std::mem::MaybeUninit;
+use std::{cmp, ptr};
 use steamworks_sys as sys;
 
 /// A handle to a Steam leaderboard
@@ -45,8 +48,8 @@ impl LeaderboardHandle {
 
         self.download_entry_range(
             sys::ELeaderboardDataRequest_k_ELeaderboardDataRequestGlobal,
-            range_start.try_into().unwrap_or(i32::max_value()),
-            range_end.try_into().unwrap_or(i32::max_value()),
+            range_start.try_into().unwrap_or(i32::MAX),
+            range_end.try_into().unwrap_or(i32::MAX),
             max_details,
         )
     }
@@ -228,10 +231,8 @@ pub struct LeaderboardScoreUploaded {
 }
 
 mod error {
-    use std::{
-        error::Error,
-        fmt::{self, Display},
-    };
+    use std::error::Error;
+    use std::fmt::{self, Display};
 
     #[derive(Debug, Clone, Eq, PartialEq, snafu::Snafu)]
     #[snafu(visibility(pub(crate)))]
