@@ -3,10 +3,10 @@ import {
   desc,
   env,
   run,
-  task,
   sh,
   shCapture,
-} from "https://deno.land/x/drake@v1.2.6/mod.ts";
+  task,
+} from "https://deno.land/x/drake@v1.5.0/mod.ts";
 
 const SHOULD_CARGO_PUBLISH = false;
 const SHOULD_PUSH_DOCS_TO_GITHUB_PAGES = true;
