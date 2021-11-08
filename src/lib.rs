@@ -34,6 +34,7 @@ pub use error::InitError;
 pub use steam::*;
 
 use crate::callbacks::CallbackDispatchers;
+use atomic::Atomic;
 use az::WrappingCast;
 use derive_more::Deref;
 use fnv::FnvHashMap;
@@ -46,7 +47,6 @@ use std::convert::TryInto;
 use std::ffi::{c_void, CStr};
 use std::mem::{self, MaybeUninit};
 use std::os::raw::c_char;
-use std::sync::atomic::{self, AtomicBool};
 use std::sync::Arc;
 use std::time::Duration;
 use std::{ptr, thread};
@@ -58,7 +58,15 @@ pub mod callbacks;
 mod steam;
 mod string_ext;
 
-static STEAM_API_INITIALIZED: AtomicBool = AtomicBool::new(false);
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum SteamApiState {
+    Stopped,
+    Running,
+    ShutdownStage1,
+    ShutdownStage2,
+}
+
+static STEAM_API_STATE: Atomic<SteamApiState> = Atomic::new(SteamApiState::Stopped);
 
 /// The core type of this crate, representing an initialized Steamworks API.
 ///
@@ -70,7 +78,6 @@ assert_impl_all!(Client: Send, Sync);
 
 #[derive(Debug)]
 struct ClientInner {
-    thread_shutdown: std::sync::mpsc::SyncSender<()>,
     callback_dispatchers: CallbackDispatchers,
     call_result_handles:
         Mutex<FnvHashMap<sys::SteamAPICall_t, futures::channel::oneshot::Sender<Vec<u8>>>>,
@@ -95,13 +102,20 @@ impl Client {
     /// for some other reason.
     pub fn init() -> Result<Self, InitError> {
         ensure!(
-            !STEAM_API_INITIALIZED.swap(true, atomic::Ordering::AcqRel),
+            STEAM_API_STATE
+                .compare_exchange(
+                    SteamApiState::Stopped,
+                    SteamApiState::Running,
+                    atomic::Ordering::AcqRel,
+                    atomic::Ordering::Acquire
+                )
+                .is_ok(),
             error::AlreadyInitialized
         );
 
         let success = unsafe { sys::SteamAPI_Init() };
         if !success {
-            STEAM_API_INITIALIZED.store(false, atomic::Ordering::Release);
+            STEAM_API_STATE.store(SteamApiState::Stopped, atomic::Ordering::Release);
             return error::Other.fail();
         }
 
@@ -114,10 +128,8 @@ impl Client {
             sys::SteamAPI_ISteamUtils_SetWarningMessageHook(*utils, Some(warning_message_hook));
         }
 
-        let (shutdown_tx, shutdown_rx) = std::sync::mpsc::sync_channel(0);
         let client = unsafe {
             Client(Arc::new(ClientInner {
-                thread_shutdown: shutdown_tx,
                 callback_dispatchers: CallbackDispatchers::new(),
                 call_result_handles: Mutex::new(FnvHashMap::default()),
                 friends: SteamworksInterface(sys::SteamAPI_SteamFriends_v017()),
@@ -129,7 +141,7 @@ impl Client {
             }))
         };
 
-        start_worker_thread(client.clone(), shutdown_rx);
+        start_worker_thread(client.clone());
         event!(Level::DEBUG, "Steamworks API initialized");
 
         Ok(client)
@@ -195,13 +207,21 @@ impl Client {
 
 impl Drop for ClientInner {
     fn drop(&mut self) {
-        self.thread_shutdown.send(()).unwrap();
+        STEAM_API_STATE.store(SteamApiState::ShutdownStage1, atomic::Ordering::Release);
+        event!(Level::DEBUG, "Steamworks API is shutting down");
+        loop {
+            thread::sleep(Duration::from_millis(1));
+
+            if STEAM_API_STATE.load(atomic::Ordering::Acquire) == SteamApiState::ShutdownStage2 {
+                break;
+            }
+        }
+
         unsafe {
             sys::SteamAPI_Shutdown();
         }
 
-        STEAM_API_INITIALIZED.store(false, atomic::Ordering::Release);
-        event!(Level::DEBUG, "Steamworks API shut down");
+        STEAM_API_STATE.store(SteamApiState::Stopped, atomic::Ordering::Release);
     }
 }
 
@@ -214,7 +234,7 @@ unsafe extern "C" fn warning_message_hook(severity: i32, debug_text: *const c_ch
     }
 }
 
-fn start_worker_thread(client: Client, shutdown_rx: std::sync::mpsc::Receiver<()>) {
+fn start_worker_thread(client: Client) {
     thread::spawn(move || {
         unsafe {
             let steam_pipe = sys::SteamAPI_GetHSteamPipe();
@@ -285,7 +305,15 @@ fn start_worker_thread(client: Client, shutdown_rx: std::sync::mpsc::Receiver<()
                     sys::SteamAPI_ManualDispatch_FreeLastCallback(steam_pipe);
                 }
 
-                if let Ok(()) = shutdown_rx.try_recv() {
+                if STEAM_API_STATE
+                    .compare_exchange_weak(
+                        SteamApiState::ShutdownStage1,
+                        SteamApiState::ShutdownStage2,
+                        atomic::Ordering::AcqRel,
+                        atomic::Ordering::Acquire,
+                    )
+                    .is_ok()
+                {
                     event!(
                         Level::DEBUG,
                         "worker thread shutting down due to receiving shutdown signal"
