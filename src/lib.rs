@@ -15,7 +15,7 @@
 //! ```no_run
 //! use steamworks::Client;
 //!
-//! let client = Client::init()?;
+//! let client = Client::init(Some(233610))?;
 //!
 //! // Gets the App ID of our application
 //! let app_id = client.app_id();
