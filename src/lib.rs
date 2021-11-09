@@ -240,7 +240,7 @@ unsafe extern "C" fn warning_message_hook(severity: i32, debug_text: *const c_ch
 }
 
 fn start_worker_thread(client: Client) {
-    thread::spawn(move || {
+    thread::Builder::new().name("Steam API Worker".into()).spawn(move || {
         unsafe {
             let steam_pipe = sys::SteamAPI_GetHSteamPipe();
             loop {
@@ -326,7 +326,7 @@ fn start_worker_thread(client: Client) {
                 thread::sleep(Duration::from_millis(1));
             }
         }
-    });
+    }).unwrap();
 }
 
 mod error {
