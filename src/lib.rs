@@ -208,7 +208,10 @@ impl Client {
 impl Drop for ClientInner {
     fn drop(&mut self) {
         STEAM_API_STATE.store(SteamApiState::ShutdownStage1, atomic::Ordering::Release);
-        event!(Level::DEBUG, "Steamworks API is shutting down");
+        event!(
+            Level::DEBUG,
+            "Preparing to shutdown Steam API; waiting for worker thread to exit"
+        );
         loop {
             thread::sleep(Duration::from_millis(1));
 
@@ -217,10 +220,12 @@ impl Drop for ClientInner {
             }
         }
 
+        event!(Level::DEBUG, "Shutting down Steam API");
         unsafe {
             sys::SteamAPI_Shutdown();
         }
 
+        event!(Level::DEBUG, "Finished shutting down Steam API");
         STEAM_API_STATE.store(SteamApiState::Stopped, atomic::Ordering::Release);
     }
 }
