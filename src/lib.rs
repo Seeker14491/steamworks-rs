@@ -49,7 +49,7 @@ use std::mem::{self, MaybeUninit};
 use std::os::raw::c_char;
 use std::sync::Arc;
 use std::time::Duration;
-use std::{ptr, thread};
+use std::{env, ptr, thread};
 use steamworks_sys as sys;
 use tracing::{event, Level};
 
@@ -98,9 +98,12 @@ unsafe impl<T> Sync for SteamworksInterface<T> {}
 impl Client {
     /// Initializes the Steamworks API, yielding a `Client`.
     ///
+    /// A Steam App ID can be provided, which functions as an alternative to using a
+    /// `steam_appid.txt` file.
+    ///
     /// Returns an error if there is already an initialized `Client`, or if `SteamAPI_Init()` fails
     /// for some other reason.
-    pub fn init() -> Result<Self, InitError> {
+    pub fn init(steam_app_id: Option<u32>) -> Result<Self, InitError> {
         ensure!(
             STEAM_API_STATE
                 .compare_exchange(
@@ -112,6 +115,10 @@ impl Client {
                 .is_ok(),
             error::AlreadyInitialized
         );
+
+        if let Some(id) = steam_app_id {
+            env::set_var("SteamAppId", id.to_string());
+        }
 
         let success = unsafe { sys::SteamAPI_Init() };
         if !success {
