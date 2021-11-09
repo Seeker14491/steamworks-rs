@@ -274,11 +274,7 @@ fn start_worker_thread(client: Client) {
                             call_completed.m_iCallback,
                             &mut failed,
                         ) {
-                            if failed {
-                                panic!(
-                                    "'SteamAPI_ManualDispatch_GetAPICallResult' indicated failure by returning a value of 'true' for its 'pbFailed' parameter"
-                                );
-                            }
+                            assert!(!failed, "'SteamAPI_ManualDispatch_GetAPICallResult' indicated failure by returning a value of 'true' for its 'pbFailed' parameter");
 
                             let call_id = call_completed.m_hAsyncCall;
                             match client.0.call_result_handles.lock().remove(&call_id) {
