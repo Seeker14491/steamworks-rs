@@ -14,7 +14,7 @@ The following is a complete example showing basic use of the library. We get a h
 
 ```rust
 fn main() -> Result<(), anyhow::Error> {
-    let client = steamworks::Client::init()?;
+    let client = steamworks::Client::init(Some(233610))?; // specify game's app id
 
     futures::executor::block_on(async {
         let leaderboard_handle = client.find_leaderboard("Broken Symmetry_1_stable").await?;
@@ -47,7 +47,7 @@ You'll need Clang installed, as this crate runs `bindgen` at build time. See [he
 
 ## A note on distributing binaries that depend on this library
 
-To run your binary that depends on this library, you will need to include the necessary `.dll`, `.dylib`, `.so` (depending on the platform) next to the executable. These are found in the `steamworks-sys\steamworks_sdk\redistributable_bin` directory. Note that this isn't necessary if you're running the executable through `cargo run`. Either way, you will probably need a `steam_appid.txt` file, as described in the [official docs](https://partner.steamgames.com/doc/sdk/api#SteamAPI_Init).
+To run your binary that depends on this library, you will need to include the necessary `.dll`, `.dylib`, `.so` (depending on the platform) next to the executable. These are found in the `steamworks-sys\steamworks_sdk\redistributable_bin` directory. Note that this isn't necessary if you're running the executable through `cargo run`.
 
 Also, add the following to your crate's `.cargo/config.toml` file (make it if it doesn't exist) to configure your compiled binary, on Linux, to locate the Steamworks shared library next to the executable:
 
