@@ -1,3 +1,5 @@
+#![allow(clippy::unnecessary_cast)]
+
 use crate::callbacks::{CallbackDispatcher, CallbackStorage};
 use crate::steam::SteamId;
 use bitflags::bitflags;

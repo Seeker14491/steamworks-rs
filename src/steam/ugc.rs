@@ -478,12 +478,19 @@ impl QueryAllUgc {
                         )
                         .expect("Workshop item's description is not valid UTF-8"),
                         steam_id_owner: details.m_ulSteamIDOwner.into(),
-                        time_created: Utc.timestamp(i64::from(details.m_rtimeCreated), 0),
-                        time_updated: Utc.timestamp(i64::from(details.m_rtimeUpdated), 0),
+                        time_created: Utc
+                            .timestamp_opt(i64::from(details.m_rtimeCreated), 0)
+                            .unwrap(),
+                        time_updated: Utc
+                            .timestamp_opt(i64::from(details.m_rtimeUpdated), 0)
+                            .unwrap(),
                         time_added_to_user_list: if details.m_rtimeAddedToUserList == 0 {
                             None
                         } else {
-                            Some(Utc.timestamp(i64::from(details.m_rtimeAddedToUserList), 0))
+                            Some(
+                                Utc.timestamp_opt(i64::from(details.m_rtimeAddedToUserList), 0)
+                                    .unwrap(),
+                            )
                         },
                         visibility: PublishedFileVisibility::from_inner(details.m_eVisibility),
                         banned: details.m_bBanned,
