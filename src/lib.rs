@@ -30,7 +30,6 @@
     unused_qualifications
 )]
 
-pub use error::InitError;
 pub use steam::*;
 
 use crate::callbacks::CallbackDispatchers;
@@ -113,7 +112,7 @@ impl Client {
                     atomic::Ordering::Acquire
                 )
                 .is_ok(),
-            error::AlreadyInitialized
+            AlreadyInitializedSnafu
         );
 
         if let Some(id) = steam_app_id {
@@ -123,7 +122,7 @@ impl Client {
         let success = unsafe { sys::SteamAPI_Init() };
         if !success {
             STEAM_API_STATE.store(SteamApiState::Stopped, atomic::Ordering::Release);
-            return error::Other.fail();
+            return OtherSnafu.fail();
         }
 
         unsafe {
@@ -336,18 +335,13 @@ fn start_worker_thread(client: Client) {
     }).unwrap();
 }
 
-mod error {
-    #[derive(Debug, snafu::Snafu)]
-    #[snafu(visibility(pub(crate)))]
-    pub enum InitError {
-        /// Tried to initialize Steam API when it was already initialized
-        #[snafu(display("Tried to initialize Steam API when it was already initialized"))]
-        AlreadyInitialized,
+#[derive(Debug, snafu::Snafu)]
+pub enum InitError {
+    /// Tried to initialize Steam API when it was already initialized
+    #[snafu(display("Tried to initialize Steam API when it was already initialized"))]
+    AlreadyInitialized,
 
-        /// The Steamworks API failed to initialize (SteamAPI_Init() returned false)
-        #[snafu(display(
-            "The Steamworks API failed to initialize (SteamAPI_Init() returned false)"
-        ))]
-        Other,
-    }
+    /// The Steamworks API failed to initialize (SteamAPI_Init() returned false)
+    #[snafu(display("The Steamworks API failed to initialize (SteamAPI_Init() returned false)"))]
+    Other,
 }

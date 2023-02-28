@@ -1,5 +1,3 @@
-pub use error::QueryAllUgcError;
-
 use crate::steam::remote_storage::UgcHandle;
 use crate::steam::{AppId, SteamId, SteamResult};
 use crate::string_ext::FromUtf8NulTruncating;
@@ -211,24 +209,19 @@ impl<'a> IntoIterator for &'a Tags {
     }
 }
 
-mod error {
-    #[derive(Debug, snafu::Snafu)]
-    #[snafu(visibility(pub(crate)))]
-    pub enum QueryAllUgcError {
-        /// Neither the creator App ID nor the consumer App ID was set to the App ID of the currently running application
-        #[snafu(display("Neither the creator App ID nor the consumer App ID was set to the App ID of the currently running application"))]
-        AppId,
+#[derive(Debug, snafu::Snafu)]
+pub enum QueryAllUgcError {
+    /// Neither the creator App ID nor the consumer App ID was set to the App ID of the currently running application
+    #[snafu(display("Neither the creator App ID nor the consumer App ID was set to the App ID of the currently running application"))]
+    AppId,
 
-        /// `CreateQueryAllUGCRequest()` failed
-        #[snafu(display("CreateQueryAllUGCRequest() failed"))]
-        CreateQueryAllUGCRequest,
+    /// `CreateQueryAllUGCRequest()` failed
+    #[snafu(display("CreateQueryAllUGCRequest() failed"))]
+    CreateQueryAllUGCRequest,
 
-        /// `SendQueryUGCRequest()` failed
-        #[snafu(display("SendQueryUGCRequest() failed: {}", steam_result))]
-        SendQueryUGCRequest {
-            steam_result: crate::steam::SteamResult,
-        },
-    }
+    /// `SendQueryUGCRequest()` failed
+    #[snafu(display("SendQueryUGCRequest() failed: {}", steam_result))]
+    SendQueryUGCRequest { steam_result: SteamResult },
 }
 
 /// A builder for configuring a request to query all UGC.
@@ -368,7 +361,7 @@ impl QueryAllUgc {
             let current_app_id = self.client.app_id();
             if let (Some(x), Some(y)) = (self.creator_app_id, self.consumer_app_id) {
                 if x != current_app_id && y != current_app_id {
-                    co.yield_(error::AppId.fail()).await;
+                    co.yield_(AppIdSnafu.fail()).await;
                 }
             }
 
@@ -393,7 +386,7 @@ impl QueryAllUgc {
                     )
                 };
                 if handle == sys::k_UGCQueryHandleInvalid {
-                    co.yield_(error::CreateQueryAllUGCRequest.fail()).await;
+                    co.yield_(CreateQueryAllUGCRequestSnafu.fail()).await;
                     break;
                 }
 
@@ -439,7 +432,7 @@ impl QueryAllUgc {
                     let result = SteamResult::from_inner(response.m_eResult);
                     if result != SteamResult::OK {
                         co.yield_(
-                            error::SendQueryUGCRequest {
+                            SendQueryUGCRequestSnafu {
                                 steam_result: result,
                             }
                             .fail(),

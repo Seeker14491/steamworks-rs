@@ -1,5 +1,3 @@
-pub use error::UgcDownloadToLocationError;
-
 use crate::steam::SteamResult;
 use crate::string_ext::FromUtf8NulTruncating;
 use crate::{AppId, Client, SteamId};
@@ -20,7 +18,7 @@ impl UgcHandle {
     ) -> impl Future<Output = Result<DownloadUGCResult, UgcDownloadToLocationError>> + Send {
         let location = CString::new(location.into());
         async move {
-            let location = location.context(error::Nul)?;
+            let location = location.context(NulSnafu)?;
 
             let response: sys::RemoteStorageDownloadUGCResult_t = unsafe {
                 let handle = sys::SteamAPI_ISteamRemoteStorage_UGCDownloadToLocation(
@@ -38,7 +36,7 @@ impl UgcHandle {
 
                 ensure!(
                     result == SteamResult::OK,
-                    error::UGCDownloadToLocation {
+                    UGCDownloadToLocationSnafu {
                         steam_result: result,
                     }
                 );
@@ -72,18 +70,13 @@ pub struct DownloadUGCResult {
     steam_id_owner: SteamId,
 }
 
-mod error {
-    #[derive(Debug, snafu::Snafu)]
-    #[snafu(visibility(pub(crate)))]
-    pub enum UgcDownloadToLocationError {
-        /// The location provided contains nul byte(s)
-        #[snafu(display("The location provided contained nul byte(s): {}", source))]
-        Nul { source: std::ffi::NulError },
+#[derive(Debug, snafu::Snafu)]
+pub enum UgcDownloadToLocationError {
+    /// The location provided contains nul byte(s)
+    #[snafu(display("The location provided contained nul byte(s): {}", source))]
+    Nul { source: std::ffi::NulError },
 
-        /// `UGCDownloadToLocation()` failed
-        #[snafu(display("UGCDownloadToLocation() failed: {}", steam_result))]
-        UGCDownloadToLocation {
-            steam_result: crate::steam::SteamResult,
-        },
-    }
+    /// `UGCDownloadToLocation()` failed
+    #[snafu(display("UGCDownloadToLocation() failed: {}", steam_result))]
+    UGCDownloadToLocation { steam_result: SteamResult },
 }

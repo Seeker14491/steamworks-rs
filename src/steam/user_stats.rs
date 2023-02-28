@@ -1,4 +1,3 @@
-pub use error::{FindLeaderboardError, UploadLeaderboardScoreError};
 use std::convert::TryFrom;
 
 use crate::steam::remote_storage::UgcHandle;
@@ -10,7 +9,9 @@ use futures_intrusive::sync::Semaphore;
 use once_cell::sync::Lazy;
 use snafu::{ensure, ResultExt};
 use std::convert::TryInto;
+use std::error::Error;
 use std::ffi::CString;
+use std::fmt::{self, Display};
 use std::mem::MaybeUninit;
 use std::{cmp, ptr};
 use steamworks_sys as sys;
@@ -228,44 +229,38 @@ pub struct LeaderboardScoreUploaded {
     pub global_rank_previous: i32,
 }
 
-mod error {
-    use std::error::Error;
-    use std::fmt::{self, Display};
+#[derive(Debug, Clone, Eq, PartialEq, snafu::Snafu)]
+pub enum FindLeaderboardError {
+    /// The leaderboard name contains nul byte(s)
+    #[snafu(display("The leaderboard name contains nul byte(s): {}", source))]
+    Nul { source: std::ffi::NulError },
 
-    #[derive(Debug, Clone, Eq, PartialEq, snafu::Snafu)]
-    #[snafu(visibility(pub(crate)))]
-    pub enum FindLeaderboardError {
-        /// The leaderboard name contains nul byte(s)
-        #[snafu(display("The leaderboard name contains nul byte(s): {}", source))]
-        Nul { source: std::ffi::NulError },
+    /// The leaderboard name is too long
+    #[snafu(display(
+        "The leaderboard name has a length of {} bytes, which is over the {} byte limit",
+        length,
+        steamworks_sys::k_cchLeaderboardNameMax
+    ))]
+    TooLong { length: usize },
 
-        /// The leaderboard name is too long
-        #[snafu(display(
-            "The leaderboard name has a length of {} bytes, which is over the {} byte limit",
-            length,
-            steamworks_sys::k_cchLeaderboardNameMax
-        ))]
-        TooLong { length: usize },
-
-        /// The specified leaderboard was not found
-        #[snafu(display("The leaderboard {:?} was not found", leaderboard_name))]
-        NotFound { leaderboard_name: std::ffi::CString },
-    }
-
-    #[derive(Debug, Copy, Clone, Default, Hash, Eq, PartialEq, Ord, PartialOrd)]
-    pub struct UploadLeaderboardScoreError;
-
-    impl Display for UploadLeaderboardScoreError {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-            write!(
-                f,
-                "A call to the Steamworks function 'UploadLeaderboardScore()' failed"
-            )
-        }
-    }
-
-    impl Error for UploadLeaderboardScoreError {}
+    /// The specified leaderboard was not found
+    #[snafu(display("The leaderboard {:?} was not found", leaderboard_name))]
+    NotFound { leaderboard_name: CString },
 }
+
+#[derive(Debug, Copy, Clone, Default, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub struct UploadLeaderboardScoreError;
+
+impl Display for UploadLeaderboardScoreError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(
+            f,
+            "A call to the Steamworks function 'UploadLeaderboardScore()' failed"
+        )
+    }
+}
+
+impl Error for UploadLeaderboardScoreError {}
 
 pub(crate) fn find_leaderboard(
     client: &Client,
@@ -278,11 +273,11 @@ pub(crate) fn find_leaderboard(
 
     let leaderboard_name = CString::new(leaderboard_name);
     async move {
-        let leaderboard_name = leaderboard_name.context(error::Nul)?;
+        let leaderboard_name = leaderboard_name.context(NulSnafu)?;
         let leaderboard_name_bytes = leaderboard_name.as_bytes_with_nul();
         ensure!(
             leaderboard_name_bytes.len() - 1 <= sys::k_cchLeaderboardNameMax as usize,
-            error::TooLong {
+            TooLongSnafu {
                 length: leaderboard_name_bytes.len() - 1
             }
         );
@@ -299,7 +294,7 @@ pub(crate) fn find_leaderboard(
 
         ensure!(
             response.m_bLeaderboardFound != 0,
-            error::NotFound { leaderboard_name }
+            NotFoundSnafu { leaderboard_name }
         );
 
         Ok(LeaderboardHandle {
