@@ -6,7 +6,7 @@ import {
   sh,
   shCapture,
   task,
-} from "https://deno.land/x/drake@v1.5.0/mod.ts";
+} from "https://deno.land/x/drake@v1.6.0/mod.ts";
 
 const SHOULD_CARGO_PUBLISH = false;
 const SHOULD_PUSH_DOCS_TO_GITHUB_PAGES = true;
@@ -47,9 +47,7 @@ desc("Upload docs to GitHub Pages");
 task("upload-docs", [], async () => {
   let origin_url;
   {
-    const { code, output, error } = await shCapture(
-      "git remote get-url origin",
-    );
+    const { code, output } = await shCapture("git remote get-url origin");
     if (code == 0) {
       origin_url = output.trim();
     } else {
@@ -73,7 +71,9 @@ task("upload-docs", [], async () => {
 run();
 
 function isValidSemVer(s: string): boolean {
-  return s.match(
-    /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/,
-  ) != null;
+  return (
+    s.match(
+      /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/
+    ) != null
+  );
 }

@@ -2,8 +2,8 @@
 name = "steamworks-sys"
 version = "0.0.0"
 authors = ["Brian Bowman <seeker14491@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [build-dependencies]
-bindgen = "0.64"
+bindgen = "0.68"
 dunce = "1"

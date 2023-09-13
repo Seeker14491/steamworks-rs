@@ -2,14 +2,15 @@
 name = "steamworks"
 version = "0.0.26"
 authors = ["Brian Bowman <seeker14491@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [workspace]
 
 [dependencies]
-atomic = "0.5"
+atomic = "0.6"
 az = "1"
-bitflags = "1"
+bitflags = "2"
+bytemuck = { version = "1", features = ["derive"] }
 chrono = "0.4"
 derive_more = "0.99"
 enum-primitive-derive = "0.2"

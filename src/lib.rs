@@ -30,6 +30,7 @@
     unused_qualifications
 )]
 
+use bytemuck::NoUninit;
 pub use steam::*;
 
 use crate::callbacks::CallbackDispatchers;
@@ -57,7 +58,8 @@ pub mod callbacks;
 mod steam;
 mod string_ext;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, NoUninit)]
+#[repr(u8)]
 enum SteamApiState {
     Stopped,
     Running,

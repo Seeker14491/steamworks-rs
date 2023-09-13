@@ -113,7 +113,7 @@ impl Hash for SteamId {
 
 impl PartialOrd for SteamId {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.as_u64().partial_cmp(&other.as_u64())
+        Some(self.cmp(other))
     }
 }
 

@@ -14,6 +14,7 @@ pub struct PersonaStateChange {
 
 bitflags! {
     /// <https://partner.steamgames.com/doc/api/ISteamFriends#EPersonaChange>
+    #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
     pub struct PersonaStateChangeFlags: u32 {
         const NAME = sys::EPersonaChange_k_EPersonaChangeName as u32;
         const STATUS = sys::EPersonaChange_k_EPersonaChangeStatus as u32;
