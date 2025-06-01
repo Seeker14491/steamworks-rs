@@ -1,13 +1,13 @@
 use std::convert::TryFrom;
 
-use crate::steam::remote_storage::UgcHandle;
-use crate::steam::SteamId;
 use crate::Client;
-use futures::lock::Mutex;
+use crate::steam::SteamId;
+use crate::steam::remote_storage::UgcHandle;
 use futures::Future;
+use futures::lock::Mutex;
 use futures_intrusive::sync::Semaphore;
 use once_cell::sync::Lazy;
-use snafu::{ensure, ResultExt};
+use snafu::{ResultExt, ensure};
 use std::convert::TryInto;
 use std::error::Error;
 use std::ffi::CString;
@@ -124,7 +124,10 @@ impl LeaderboardHandle {
         let details_count = match details {
             Some(xs) => {
                 let len = xs.len();
-                assert!(len <= 64, "The details passed in to 'upload_leaderboard_score' has a length of {len}, but the limit is 64");
+                assert!(
+                    len <= 64,
+                    "The details passed in to 'upload_leaderboard_score' has a length of {len}, but the limit is 64"
+                );
                 i32::try_from(len).unwrap()
             }
             None => 0,

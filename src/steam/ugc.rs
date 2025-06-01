@@ -1,7 +1,7 @@
+use crate::Client;
 use crate::steam::remote_storage::UgcHandle;
 use crate::steam::{AppId, SteamId, SteamResult};
 use crate::string_ext::FromUtf8NulTruncating;
-use crate::Client;
 use chrono::offset::TimeZone;
 use chrono::{DateTime, Utc};
 use derive_more::{From, Into};
@@ -209,7 +209,9 @@ impl<'a> IntoIterator for &'a Tags {
 #[derive(Debug, snafu::Snafu)]
 pub enum QueryAllUgcError {
     /// Neither the creator App ID nor the consumer App ID was set to the App ID of the currently running application
-    #[snafu(display("Neither the creator App ID nor the consumer App ID was set to the App ID of the currently running application"))]
+    #[snafu(display(
+        "Neither the creator App ID nor the consumer App ID was set to the App ID of the currently running application"
+    ))]
     AppId,
 
     /// `CreateQueryAllUGCRequest()` failed
@@ -356,10 +358,11 @@ impl QueryAllUgc {
     pub fn run(self) -> impl Stream<Item = Result<UgcDetails, QueryAllUgcError>> + Send {
         Gen::new(|co| async move {
             let current_app_id = self.client.app_id();
-            if let (Some(x), Some(y)) = (self.creator_app_id, self.consumer_app_id) {
-                if x != current_app_id && y != current_app_id {
-                    co.yield_(AppIdSnafu.fail()).await;
-                }
+            if let (Some(x), Some(y)) = (self.creator_app_id, self.consumer_app_id)
+                && x != current_app_id
+                && y != current_app_id
+            {
+                co.yield_(AppIdSnafu.fail()).await;
             }
 
             let max_results = self.max_results.unwrap_or(u32::MAX);

@@ -2,7 +2,7 @@ use crate::steam::SteamResult;
 use crate::string_ext::FromUtf8NulTruncating;
 use crate::{AppId, Client, SteamId};
 use futures::Future;
-use snafu::{ensure, ResultExt};
+use snafu::{ResultExt, ensure};
 use std::ffi::CString;
 use steamworks_sys as sys;
 

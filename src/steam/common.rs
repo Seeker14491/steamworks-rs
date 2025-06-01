@@ -1,5 +1,5 @@
-use crate::callbacks::PersonaStateChangeFlags;
 use crate::Client;
+use crate::callbacks::PersonaStateChangeFlags;
 use enum_primitive_derive::Primitive;
 use futures::{Future, StreamExt};
 use num_traits::FromPrimitive;
@@ -280,9 +280,15 @@ impl Display for SteamResult {
             LimitExceeded => "Too much of a good thing.",
             Revoked => "Access has been revoked (used for revoked guest passes.)",
             Expired => "License/Guest pass the user is trying to access is expired.",
-            AlreadyRedeemed => "Guest pass has already been redeemed by account, cannot be used again.",
-            DuplicateRequest => "The request is a duplicate and the action has already occurred in the past, ignored this time.",
-            AlreadyOwned => "All the games in this guest pass redemption request are already owned by the user.",
+            AlreadyRedeemed => {
+                "Guest pass has already been redeemed by account, cannot be used again."
+            }
+            DuplicateRequest => {
+                "The request is a duplicate and the action has already occurred in the past, ignored this time."
+            }
+            AlreadyOwned => {
+                "All the games in this guest pass redemption request are already owned by the user."
+            }
             IPNotFound => "IP address not found.",
             PersistFailed => "Failed to write change to the data store.",
             LockingFailed => "Failed to acquire access lock for this operation.",
@@ -299,50 +305,90 @@ impl Display for SteamResult {
             ServiceReadOnly => "This service is not accepting content changes right now.",
             AccountNotFeatured => "Account doesn't have value, so this feature isn't available.",
             AdministratorOK => "Allowed to take this action, but only because requester is admin.",
-            ContentVersion => "A Version mismatch in content transmitted within the Steam protocol.",
-            TryAnotherCM => "The current CM can't service the user making a request, user should try another.",
-            PasswordRequiredToKickSession => "You are already logged in elsewhere, this cached credential login has failed.",
-            AlreadyLoggedInElsewhere => "The user is logged in elsewhere. (Use k_EResultLoggedInElsewhere instead!)",
+            ContentVersion => {
+                "A Version mismatch in content transmitted within the Steam protocol."
+            }
+            TryAnotherCM => {
+                "The current CM can't service the user making a request, user should try another."
+            }
+            PasswordRequiredToKickSession => {
+                "You are already logged in elsewhere, this cached credential login has failed."
+            }
+            AlreadyLoggedInElsewhere => {
+                "The user is logged in elsewhere. (Use k_EResultLoggedInElsewhere instead!)"
+            }
             Suspended => "Long running operation has suspended/paused. (eg. content download.)",
-            Cancelled => "Operation has been canceled, typically by user. (eg. a content download.)",
+            Cancelled => {
+                "Operation has been canceled, typically by user. (eg. a content download.)"
+            }
             DataCorruption => "Operation canceled because data is ill formed or unrecoverable.",
             DiskFull => "Operation canceled - not enough disk space.",
             RemoteCallFailed => "The remote or IPC call has failed.",
             PasswordUnset => "Password could not be verified as it's unset server side.",
-            ExternalAccountUnlinked => "External account (PSN, Facebook...) is not linked to a Steam account.",
+            ExternalAccountUnlinked => {
+                "External account (PSN, Facebook...) is not linked to a Steam account."
+            }
             PSNTicketInvalid => "PSN ticket was invalid.",
-            ExternalAccountAlreadyLinked => "External account (PSN, Facebook...) is already linked to some other account, must explicitly request to replace/delete the link first.",
-            RemoteFileConflict => "The sync cannot resume due to a conflict between the local and remote files.",
+            ExternalAccountAlreadyLinked => {
+                "External account (PSN, Facebook...) is already linked to some other account, must explicitly request to replace/delete the link first."
+            }
+            RemoteFileConflict => {
+                "The sync cannot resume due to a conflict between the local and remote files."
+            }
             IllegalPassword => "The requested new password is not allowed.",
-            SameAsPreviousValue => "New value is the same as the old one. This is used for secret question and answer.",
+            SameAsPreviousValue => {
+                "New value is the same as the old one. This is used for secret question and answer."
+            }
             AccountLogonDenied => "Account login denied due to 2nd factor authentication failure.",
             CannotUseOldPassword => "The requested new password is not legal.",
             InvalidLoginAuthCode => "Account login denied due to auth code invalid.",
-            AccountLogonDeniedNoMail => "Account login denied due to 2nd factor auth failure - and no mail has been sent.",
-            HardwareNotCapableOfIPT => "The users hardware does not support Intel's Identity Protection Technology (IPT).",
-            IPTInitError => "Intel's Identity Protection Technology (IPT) has failed to initialize.",
-            ParentalControlRestricted => "Operation failed due to parental control restrictions for current user.",
+            AccountLogonDeniedNoMail => {
+                "Account login denied due to 2nd factor auth failure - and no mail has been sent."
+            }
+            HardwareNotCapableOfIPT => {
+                "The users hardware does not support Intel's Identity Protection Technology (IPT)."
+            }
+            IPTInitError => {
+                "Intel's Identity Protection Technology (IPT) has failed to initialize."
+            }
+            ParentalControlRestricted => {
+                "Operation failed due to parental control restrictions for current user."
+            }
             FacebookQueryError => "Facebook query returned an error.",
             ExpiredLoginAuthCode => "Account login denied due to an expired auth code.",
             IPLoginRestrictionFailed => "The login failed due to an IP restriction.",
-            AccountLockedDown => "The current users account is currently locked for use. This is likely due to a hijacking and pending ownership verification.",
-            AccountLogonDeniedVerifiedEmailRequired => "The logon failed because the accounts email is not verified.",
+            AccountLockedDown => {
+                "The current users account is currently locked for use. This is likely due to a hijacking and pending ownership verification."
+            }
+            AccountLogonDeniedVerifiedEmailRequired => {
+                "The logon failed because the accounts email is not verified."
+            }
             NoMatchingURL => "There is no URL matching the provided values.",
             BadResponse => "Bad Response due to a Parse failure, missing field, etc.",
-            RequirePasswordReEntry => "The user cannot complete the action until they re-enter their password.",
+            RequirePasswordReEntry => {
+                "The user cannot complete the action until they re-enter their password."
+            }
             ValueOutOfRange => "The value entered is outside the acceptable range.",
             UnexpectedError => "Something happened that we didn't expect to ever happen.",
             Disabled => "The requested service has been configured to be unavailable.",
             InvalidCEGSubmission => "The files submitted to the CEG server are not valid.",
             RestrictedDevice => "The device being used is not allowed to perform this action.",
             RegionLocked => "The action could not be complete because it is region restricted.",
-            RateLimitExceeded => "Temporary rate limit exceeded, try again later, different from k_EResultLimitExceeded which may be permanent.",
+            RateLimitExceeded => {
+                "Temporary rate limit exceeded, try again later, different from k_EResultLimitExceeded which may be permanent."
+            }
             AccountLoginDeniedNeedTwoFactor => "Need two-factor code to login.",
             ItemDeleted => "The thing we're trying to access has been deleted.",
-            AccountLoginDeniedThrottle => "Login attempt failed, try to throttle response to possible attacker.",
+            AccountLoginDeniedThrottle => {
+                "Login attempt failed, try to throttle response to possible attacker."
+            }
             TwoFactorCodeMismatch => "Two factor authentication (Steam Guard) code is incorrect.",
-            TwoFactorActivationCodeMismatch => "The activation code for two-factor authentication (Steam Guard) didn't match.",
-            AccountAssociatedToMultiplePartners => "The current account has been associated with multiple partners.",
+            TwoFactorActivationCodeMismatch => {
+                "The activation code for two-factor authentication (Steam Guard) didn't match."
+            }
+            AccountAssociatedToMultiplePartners => {
+                "The current account has been associated with multiple partners."
+            }
             NotModified => "The data has not been modified.",
             NoMobileDevice => "The account does not have a mobile device associated with it.",
             TimeNotSynced => "The time presented is out of range or tolerance.",
@@ -355,14 +401,20 @@ impl Display for SteamResult {
             NotSettled => "Can't perform operation until payment has settled.",
             NeedCaptcha => "The user needs to provide a valid captcha.",
             GSLTDenied => "A game server login token owned by this token's owner has been banned.",
-            GSOwnerDenied => "Game server owner is denied for some other reason such as account locked, community ban, vac ban, missing phone, etc.",
+            GSOwnerDenied => {
+                "Game server owner is denied for some other reason such as account locked, community ban, vac ban, missing phone, etc."
+            }
             InvalidItemType => "The type of thing we were requested to act on is invalid.",
             IPBanned => "The IP address has been banned from taking this action.",
-            GSLTExpired => "This Game Server Login Token (GSLT) has expired from disuse; it can be reset for use.",
+            GSLTExpired => {
+                "This Game Server Login Token (GSLT) has expired from disuse; it can be reset for use."
+            }
             InsufficientFunds => "user doesn't have enough wallet funds to complete the action",
             TooManyPending => "There are too many of this thing pending already",
             NoSiteLicensesFound => "No site licenses found",
-            WGNetworkSendExceeded => "the WG couldn't send a response because we exceeded max network send size",
+            WGNetworkSendExceeded => {
+                "the WG couldn't send a response because we exceeded max network send size"
+            }
             AccountNotFriends => "the user is not mutually friends",
             LimitedUserAccount => "the user is limited",
             CantRemoveItem => "item can't be removed",

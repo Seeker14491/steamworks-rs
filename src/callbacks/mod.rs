@@ -16,14 +16,16 @@ pub(crate) unsafe fn dispatch_callbacks(
     callback_dispatchers: &CallbackDispatchers,
     callback_msg: sys::CallbackMsg_t,
 ) {
-    match callback_msg.m_iCallback.wrapping_cast() {
-        sys::PersonaStateChange_t_k_iCallback => callback_dispatchers
-            .persona_state_change
-            .dispatch(callback_msg.m_pubParam, callback_msg.m_cubParam),
-        sys::SteamShutdown_t_k_iCallback => callback_dispatchers
-            .steam_shutdown
-            .dispatch(callback_msg.m_pubParam, callback_msg.m_cubParam),
-        _ => {}
+    unsafe {
+        match callback_msg.m_iCallback.wrapping_cast() {
+            sys::PersonaStateChange_t_k_iCallback => callback_dispatchers
+                .persona_state_change
+                .dispatch(callback_msg.m_pubParam, callback_msg.m_cubParam),
+            sys::SteamShutdown_t_k_iCallback => callback_dispatchers
+                .steam_shutdown
+                .dispatch(callback_msg.m_pubParam, callback_msg.m_cubParam),
+            _ => {}
+        }
     }
 }
 
@@ -65,7 +67,7 @@ pub(crate) trait CallbackDispatcher {
             size_of::<Self::RawCallbackData>()
         );
 
-        let raw = &*(callback_data as *const Self::RawCallbackData);
+        let raw = unsafe { &*(callback_data as *const Self::RawCallbackData) };
         let mapped = Self::map_callback_data(raw);
 
         let mut storage = self.storage().lock();

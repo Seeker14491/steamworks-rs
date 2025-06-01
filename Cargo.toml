@@ -2,7 +2,7 @@
 name = "steamworks"
 version = "0.0.27"
 authors = ["Brian Bowman <seeker14491@gmail.com>"]
-edition = "2021"
+edition = "2024"
 
 [workspace]
 

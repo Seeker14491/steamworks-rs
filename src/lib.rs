@@ -44,14 +44,14 @@ use parking_lot::Mutex;
 use snafu::ensure;
 use static_assertions::assert_impl_all;
 use std::convert::TryInto;
-use std::ffi::{c_void, CStr};
+use std::ffi::{CStr, c_void};
 use std::mem::MaybeUninit;
 use std::os::raw::c_char;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{env, ptr, thread};
 use steamworks_sys as sys;
-use tracing::{event, Level};
+use tracing::{Level, event};
 
 pub mod callbacks;
 
@@ -118,7 +118,8 @@ impl Client {
         );
 
         if let Some(id) = steam_app_id {
-            env::set_var("SteamAppId", id.to_string());
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            unsafe { env::set_var("SteamAppId", id.to_string()) };
         }
 
         let success = unsafe { sys::SteamAPI_Init() };
@@ -188,12 +189,12 @@ impl Client {
     /// <https://partner.steamgames.com/doc/api/ISteamFriends#PersonaStateChange_t>
     pub fn on_persona_state_changed(
         &self,
-    ) -> impl Stream<Item = callbacks::PersonaStateChange> + Send {
+    ) -> impl Stream<Item = callbacks::PersonaStateChange> + Send + use<'_> {
         callbacks::register_to_receive_callback(&self.0.callback_dispatchers.persona_state_change)
     }
 
     /// <https://partner.steamgames.com/doc/api/ISteamUtils#SteamShutdown_t>
-    pub fn on_steam_shutdown(&self) -> impl Stream<Item = ()> + Send {
+    pub fn on_steam_shutdown(&self) -> impl Stream<Item = ()> + Send + use<'_> {
         callbacks::register_to_receive_callback(&self.0.callback_dispatchers.steam_shutdown)
     }
 
@@ -207,7 +208,7 @@ impl Client {
             let bytes = result.unwrap();
 
             assert_eq!(bytes.len(), size_of::<CallResult>());
-            ptr::read_unaligned(bytes.as_ptr() as *const CallResult)
+            unsafe { ptr::read_unaligned(bytes.as_ptr() as *const CallResult) }
         })
         .await
     }
@@ -239,7 +240,7 @@ impl Drop for ClientInner {
 }
 
 unsafe extern "C" fn warning_message_hook(severity: i32, debug_text: *const c_char) {
-    let debug_text = CStr::from_ptr(debug_text);
+    let debug_text = unsafe { CStr::from_ptr(debug_text) };
     if severity == 1 {
         event!(Level::WARN, ?debug_text, "Steam API warning");
     } else {
