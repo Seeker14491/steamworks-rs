@@ -6,15 +6,18 @@ Only a (very) tiny portion of the Steamworks API has been implemented in this li
 
 The bindings aim to be easy to use and idiomatic, while still following the structure of the official C++ API close enough so the official Steamworks API docs remain helpful.
 
-### [Docs](https://seeker14491.github.io/steamworks-rs/steamworks) *(for the latest tagged release)*
+## [Docs](https://seeker14491.github.io/steamworks-rs/steamworks) *(for the latest tagged release)*
 
 ## Example
 
-The following is a complete example showing basic use of the library. We get a handle to a leaderboard using the leaderboard's name, then we download the top 5 leaderboard entries, and then for each entry we resolve the player's name and print it along with the player's time:
+The following is a complete example showing basic use of the library. We get a handle to a leaderboard for the game [Distance](http://survivethedistance.com/) using the leaderboard's name, then we download the top 5 leaderboard entries, and then for each entry we resolve the player's name and print it along with the player's time:
 
 ```rust
 fn main() -> Result<(), anyhow::Error> {
-    let client = steamworks::Client::init(Some(233610))?; // specify game's app id
+    // Set the App ID to be Distance's. This is used when initializing the Steamworks API.
+    unsafe { env::set_var("SteamAppId", "233610"); }
+
+    let client = steamworks::Client::init()?;
 
     futures::executor::block_on(async {
         let leaderboard_handle = client.find_leaderboard("Broken Symmetry_1_stable").await?;
@@ -29,7 +32,7 @@ fn main() -> Result<(), anyhow::Error> {
 }
 ```
 
-Run under the context of [Distance](http://survivethedistance.com/), this code produced this output when I ran it:
+This code produced this output when I ran it:
 
 ```
 player, time (ms): Brionac, 74670

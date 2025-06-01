@@ -13,11 +13,16 @@
 //! # Example
 //!
 //! ```no_run
+//! use std::env;
 //! use steamworks::Client;
 //!
-//! let client = Client::init(Some(233610))?;
+//! // Set the App ID which is used when initializing the Steamworks API
+//! unsafe { env::set_var("SteamAppId", "233610"); }
 //!
-//! // Gets the App ID of our application
+//! // Initialize the Steamworks API
+//! let client = Client::init()?;
+//!
+//! // We can now use the client to access Steamworks API functionality
 //! let app_id = client.app_id();
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
@@ -49,7 +54,7 @@ use std::mem::MaybeUninit;
 use std::os::raw::c_char;
 use std::sync::Arc;
 use std::time::Duration;
-use std::{env, ptr, thread};
+use std::{ptr, thread};
 use steamworks_sys as sys;
 use tracing::{Level, event};
 
@@ -99,12 +104,12 @@ unsafe impl<T> Sync for SteamworksInterface<T> {}
 impl Client {
     /// Initializes the Steamworks API, yielding a `Client`.
     ///
-    /// A Steam App ID can be provided, which functions as an alternative to using a
+    /// The Steamworks API will read the App ID from the `SteamAppId` environment variable, or a
     /// `steam_appid.txt` file.
     ///
     /// Returns an error if there is already an initialized `Client`, or if `SteamAPI_Init()` fails
     /// for some other reason.
-    pub fn init(steam_app_id: Option<u32>) -> Result<Self, InitError> {
+    pub fn init() -> Result<Self, InitError> {
         ensure!(
             STEAM_API_STATE
                 .compare_exchange(
@@ -116,11 +121,6 @@ impl Client {
                 .is_ok(),
             AlreadyInitializedSnafu
         );
-
-        if let Some(id) = steam_app_id {
-            // TODO: Audit that the environment access only happens in single-threaded code.
-            unsafe { env::set_var("SteamAppId", id.to_string()) };
-        }
 
         let success = unsafe { sys::SteamAPI_Init() };
         if !success {
