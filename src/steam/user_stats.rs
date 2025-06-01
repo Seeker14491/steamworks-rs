@@ -124,7 +124,7 @@ impl LeaderboardHandle {
         let details_count = match details {
             Some(xs) => {
                 let len = xs.len();
-                assert!(len <= 64, "The details passed in to 'upload_leaderboard_score' has a length of {}, but the limit is 64", len);
+                assert!(len <= 64, "The details passed in to 'upload_leaderboard_score' has a length of {len}, but the limit is 64");
                 i32::try_from(len).unwrap()
             }
             None => 0,

@@ -157,7 +157,7 @@ pub enum WorkshopFileType {
 impl WorkshopFileType {
     pub(crate) fn from_inner(inner: sys::EWorkshopFileType) -> Self {
         WorkshopFileType::from_i32(inner as i32)
-            .unwrap_or_else(|| panic!("Unknown EWorkshopFileType discriminant: {}", inner))
+            .unwrap_or_else(|| panic!("Unknown EWorkshopFileType discriminant: {inner}"))
     }
 }
 
@@ -175,10 +175,7 @@ pub enum PublishedFileVisibility {
 impl PublishedFileVisibility {
     pub(crate) fn from_inner(inner: sys::ERemoteStoragePublishedFileVisibility) -> Self {
         PublishedFileVisibility::from_i32(inner as i32).unwrap_or_else(|| {
-            panic!(
-                "Unknown ERemoteStoragePublishedFileVisibility discriminant: {}",
-                inner
-            )
+            panic!("Unknown ERemoteStoragePublishedFileVisibility discriminant: {inner}")
         })
     }
 }

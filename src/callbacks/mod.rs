@@ -5,7 +5,6 @@ use futures::Stream;
 use parking_lot::Mutex;
 use slotmap::DenseSlotMap;
 use std::convert::TryFrom;
-use std::mem;
 use steamworks_sys as sys;
 
 mod persona_state_change;
@@ -58,12 +57,12 @@ pub(crate) trait CallbackDispatcher {
     unsafe fn dispatch(&self, callback_data: *const u8, callback_data_len: i32) {
         assert!(!callback_data.is_null());
         assert_eq!(
-            callback_data.align_offset(mem::align_of::<Self::RawCallbackData>()),
+            callback_data.align_offset(align_of::<Self::RawCallbackData>()),
             0
         );
         assert_eq!(
             usize::try_from(callback_data_len).unwrap(),
-            mem::size_of::<Self::RawCallbackData>()
+            size_of::<Self::RawCallbackData>()
         );
 
         let raw = &*(callback_data as *const Self::RawCallbackData);

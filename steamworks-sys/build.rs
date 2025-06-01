@@ -66,6 +66,6 @@ fn main() {
         fs::copy(path.join(file), out_path.join(file)).unwrap();
     }
 
-    println!("cargo:rustc-link-lib=dylib={}", lib);
+    println!("cargo:rustc-link-lib=dylib={lib}");
     println!("cargo:rustc-link-search={}", out_path.display());
 }

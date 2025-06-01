@@ -245,7 +245,7 @@ pub enum SteamResult {
 impl SteamResult {
     pub(crate) fn from_inner(inner: sys::EResult) -> Self {
         SteamResult::from_i32(inner as i32)
-            .unwrap_or_else(|| panic!("Unknown EResult variant: {}", inner))
+            .unwrap_or_else(|| panic!("Unknown EResult variant: {inner}"))
     }
 }
 
@@ -368,6 +368,6 @@ impl Display for SteamResult {
             CantRemoveItem => "item can't be removed",
         };
 
-        write!(f, "{}", error_string)
+        write!(f, "{error_string}")
     }
 }

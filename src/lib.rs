@@ -45,7 +45,7 @@ use snafu::ensure;
 use static_assertions::assert_impl_all;
 use std::convert::TryInto;
 use std::ffi::{c_void, CStr};
-use std::mem::{self, MaybeUninit};
+use std::mem::MaybeUninit;
 use std::os::raw::c_char;
 use std::sync::Arc;
 use std::time::Duration;
@@ -206,7 +206,7 @@ impl Client {
         rx.map(|result| {
             let bytes = result.unwrap();
 
-            assert_eq!(bytes.len(), mem::size_of::<CallResult>());
+            assert_eq!(bytes.len(), size_of::<CallResult>());
             ptr::read_unaligned(bytes.as_ptr() as *const CallResult)
         })
         .await
@@ -270,7 +270,7 @@ fn start_worker_thread(client: Client) {
                         assert_eq!(
                             callback
                                 .m_pubParam
-                                .align_offset(mem::align_of::<sys::SteamAPICallCompleted_t>()),
+                                .align_offset(align_of::<sys::SteamAPICallCompleted_t>()),
                             0
                         );
                         let call_completed =
