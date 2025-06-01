@@ -1,0 +1,9 @@
+(function() {
+    var implementors = Object.fromEntries([["steamworks",[["impl <a class=\"trait\" href=\"https://docs.rs/num-traits/0.2/num_traits/cast/trait.FromPrimitive.html\" title=\"trait num_traits::cast::FromPrimitive\">FromPrimitive</a> for <a class=\"enum\" href=\"steamworks/enum.SteamResult.html\" title=\"enum steamworks::SteamResult\">SteamResult</a>"],["impl <a class=\"trait\" href=\"https://docs.rs/num-traits/0.2/num_traits/cast/trait.FromPrimitive.html\" title=\"trait num_traits::cast::FromPrimitive\">FromPrimitive</a> for <a class=\"enum\" href=\"steamworks/ugc/enum.MatchingUgcType.html\" title=\"enum steamworks::ugc::MatchingUgcType\">MatchingUgcType</a>"],["impl <a class=\"trait\" href=\"https://docs.rs/num-traits/0.2/num_traits/cast/trait.FromPrimitive.html\" title=\"trait num_traits::cast::FromPrimitive\">FromPrimitive</a> for <a class=\"enum\" href=\"steamworks/ugc/enum.PublishedFileVisibility.html\" title=\"enum steamworks::ugc::PublishedFileVisibility\">PublishedFileVisibility</a>"],["impl <a class=\"trait\" href=\"https://docs.rs/num-traits/0.2/num_traits/cast/trait.FromPrimitive.html\" title=\"trait num_traits::cast::FromPrimitive\">FromPrimitive</a> for <a class=\"enum\" href=\"steamworks/ugc/enum.WorkshopFileType.html\" title=\"enum steamworks::ugc::WorkshopFileType\">WorkshopFileType</a>"]]]]);
+    if (window.register_implementors) {
+        window.register_implementors(implementors);
+    } else {
+        window.pending_implementors = implementors;
+    }
+})()
+//{"start":57,"fragment_lengths":[1282]}
