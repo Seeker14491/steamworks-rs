@@ -5,5 +5,5 @@ authors = ["Brian Bowman <seeker14491@gmail.com>"]
 edition = "2021"
 
 [build-dependencies]
-bindgen = "0.68"
+bindgen = "0.71"
 dunce = "1"

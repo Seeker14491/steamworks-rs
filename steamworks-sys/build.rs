@@ -13,6 +13,11 @@ fn main() {
             sdk_loc.join("public").to_str().unwrap(),
             "-Wno-deprecated-declarations",
         ])
+        // These are declared opaque to workaround https://github.com/rust-lang/rust-bindgen/issues/3166
+        .opaque_type("ISteamParties")
+        .opaque_type("ISteamUGC")
+        .opaque_type("ISteamInventory")
+        .opaque_type("ISteamVideo")
         .generate()
         .expect("Error generating bindings");
 
